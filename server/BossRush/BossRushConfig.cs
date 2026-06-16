@@ -40,9 +40,9 @@ public sealed class BossRushConfig
     /// <summary>Timed enhancements expire after this long unless the player dies first.</summary>
     public float EnhancementDurationSeconds { get; set; } = 300.0f; // 5 minutes
 
-    // ── Relics / beyond-16 power (DESIGN.md #7, §3) ───────────────────────────────
-    /// <summary>Number of real Deadlock item slots before extra picks become modifier-based "Relics".</summary>
-    public int RealItemSlotCap { get; set; } = 16;
+    // ── Items beyond the 12 visible slots (DESIGN.md #7, §3) ──────────────────────
+    // No cap to configure: under the Street Brawl ruleset, AddItem keeps granting items past the
+    // 12 visible slots (they stay equipped, just hidden). Showing them is an optional client HUD.
 
     // ── Objective (DESIGN.md #1, #3) ──────────────────────────────────────────────
     /// <summary>How many Guardians to run per lane (vanilla is 1× — this doubles defenses).</summary>

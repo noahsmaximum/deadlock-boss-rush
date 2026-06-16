@@ -1,19 +1,20 @@
-using DeadworksManaged.Api; // ⚠️ provisional — verify in P0
+using DeadworksManaged.Api;
 
 namespace BossRush;
 
 /// <summary>
-/// DESIGN.md #12 — every <see cref="BossRushConfig.RageWaveIntervalMinutes"/> minutes, flood
-/// the map with <see cref="BossRushConfig.RageWaveTrooperMultiplier"/>× troopers on each side,
-/// announce it (HUD + custom sound), and hold the "rage" state until every spawned wave
-/// entity is dead ("until cleared"). The custom audio asset ships in the client addon.
+/// DESIGN.md #12 — every <see cref="BossRushConfig.RageWaveIntervalMinutes"/> minutes, flood the
+/// map with <see cref="BossRushConfig.RageWaveTrooperMultiplier"/>× troopers on each side,
+/// announce it (HUD + a custom sound shipped in the client addon), and hold the "rage" state
+/// until every spawned wave entity is dead ("until cleared").
 /// </summary>
 public sealed class RageWaveSystem
 {
     private readonly BossRushConfig _cfg;
     private readonly ITimer _timer;
     private IHandle? _loop;
-    private readonly List<CBaseEntity> _activeWave = new();
+    private IHandle? _clearPoll;
+    private readonly List<uint> _waveHandles = new(); // entity handles of spawned wave troopers
     public bool RageActive { get; private set; }
 
     public RageWaveSystem(BossRushConfig cfg, ITimer timer)
@@ -25,50 +26,57 @@ public sealed class RageWaveSystem
     public void Start()
     {
         _loop?.Cancel();
-        _loop = _timer.Every(_cfg.RageWaveIntervalMinutes.Minutes(), TriggerWave);
+        _loop = _timer.Every(((int)(_cfg.RageWaveIntervalMinutes * 60)).Seconds(), TriggerWave);
     }
 
     public void Stop()
     {
-        _loop?.Cancel();
-        _loop = null;
-        _activeWave.Clear();
+        _loop?.Cancel(); _loop = null;
+        _clearPoll?.Cancel(); _clearPoll = null;
+        _waveHandles.Clear();
         RageActive = false;
     }
 
     private void TriggerWave()
     {
-        if (RageActive) return; // don't stack waves; skip if the last one isn't cleared yet
+        if (RageActive) return; // don't stack; wait for the previous surge to clear
         RageActive = true;
 
         Announce("RAGE WAVE", "The map is overrun — clear it to break the surge!");
-        PlayRageSound();
+        PlayRageSoundForEveryone();
 
-        // TODO(P4): spawn RageWaveTrooperMultiplier× troopers per side. Reuse SpawnDirector's
-        // trooper-spawn helper (correct classname + lane spawn points discovered in P1).
-        //   foreach (var point in TrooperSpawnPoints())
-        //     for (int i = 0; i < BaseCount * _cfg.RageWaveTrooperMultiplier; i++)
-        //       _activeWave.Add(SpawnTrooper(point));
+        _waveHandles.Clear();
+        // TODO(P4): spawn RageWaveTrooperMultiplier× npc_trooper per side at lane spawn points,
+        // recording each entity handle so CheckCleared() can tell when the surge is gone:
+        //   var t = CBaseEntity.CreateByName("npc_trooper");
+        //   t.Teleport(position: point); t.TeamNum = team; t.Spawn();
+        //   _waveHandles.Add(t.EntityHandle);
 
-        // Poll for "cleared" rather than tracking every death event.
-        _timer.Every(2.Seconds(), CheckCleared);
+        _clearPoll?.Cancel();
+        _clearPoll = _timer.Every(2.Seconds(), CheckCleared);
     }
 
     private void CheckCleared()
     {
-        _activeWave.RemoveAll(e => e is null || !e.IsValid); // ⚠️ confirm IsValid member name
-        if (_activeWave.Count == 0 && RageActive)
+        _waveHandles.RemoveAll(h =>
+        {
+            var e = CBaseEntity.FromHandle(h);
+            return e == null || !e.IsAlive;
+        });
+
+        if (_waveHandles.Count == 0 && RageActive)
         {
             RageActive = false;
+            _clearPoll?.Cancel(); _clearPoll = null;
             Announce("Wave cleared", "The surge subsides… for now.");
         }
     }
 
-    private void PlayRageSound()
+    private static void PlayRageSoundForEveryone()
     {
-        // EmitSound is on entities; emit from each player pawn (or a world entity) so every
-        // client hears the client-addon soundevent. TODO(P4): pick the emitter.
-        // somePawn.EmitSound(_cfg.RageWaveStartSound);
+        // Emit the client-addon soundevent from each hero pawn so every player hears it.
+        foreach (var pawn in Players.GetAllPawns())
+            pawn.EmitSound("bossrush.ragewave.start"); // matches client/soundevents
     }
 
     private static void Announce(string title, string desc) =>

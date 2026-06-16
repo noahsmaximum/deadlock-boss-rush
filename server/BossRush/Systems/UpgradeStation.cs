@@ -1,50 +1,54 @@
-using DeadworksManaged.Api; // ⚠️ provisional — verify in P0
+using DeadworksManaged.Api;
 
 namespace BossRush;
 
 /// <summary>
-/// DESIGN.md #5 — the shop becomes an Upgrade Station. There is no shop-catalog API, so this is
-/// a *station interaction*: when a hero is in a station zone, they can upgrade an item they
-/// already hold to its enhanced version for <see cref="BossRushConfig.UpgradeCostMultiplier"/>×
-/// its normal price. (Reskinning the shop's visuals to look like a station is optional client
-/// Panorama work — see client/README.md.)
+/// DESIGN.md #5 — the shop becomes an Upgrade Station. There is no shop-catalog API, so this is a
+/// *station interaction*: enhance an item you already hold to its (temporary) enhanced version for
+/// <see cref="BossRushConfig.UpgradeCostMultiplier"/>× its normal price. Driven by an
+/// <c>!upgrade &lt;item&gt;</c> command for now; a proximity zone + HUD prompt comes in P2.
 /// </summary>
 public sealed class UpgradeStation
 {
     private readonly BossRushConfig _cfg;
+    private readonly EnhancementSystem _enhancements;
 
-    public UpgradeStation(BossRushConfig cfg) => _cfg = cfg;
-
-    /// <summary>Called from the plugin's entity-touch hook for station trigger zones.</summary>
-    public void OnEntityTouch(EntityTouchEvent e)
+    public UpgradeStation(BossRushConfig cfg, EnhancementSystem enhancements)
     {
-        // TODO(P2): detect entering a station zone; prompt the player (HUD announcement or a
-        // chat/console command flow) with which held item to enhance.
+        _cfg = cfg;
+        _enhancements = enhancements;
     }
 
-    /// <summary>
-    /// Performs the upgrade: charge 2× the item's price, then swap the base item for its
-    /// enhanced version. Returns false if the player can't afford it / doesn't hold it.
-    /// </summary>
+    /// <summary>Entering a station trigger zone (P2). For now, upgrades go through the command.</summary>
+    public void OnEntityTouch(EntityTouchEvent e)
+    {
+        // TODO(P2): detect a station zone; prompt the toucher with their upgradeable items.
+    }
+
+    public void HandleUpgradeCommand(CCitadelPlayerController caller, string itemName)
+    {
+        var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
+        if (pawn == null) return;
+
+        if (TryUpgrade(pawn, itemName))
+            Chat.PrintToChat(caller, $"[Boss Rush] Enhanced {itemName} for {_cfg.EnhancementDurationSeconds:F0}s.");
+        else
+            Chat.PrintToChat(caller, $"[Boss Rush] Can't enhance {itemName} (not held or not enough souls).");
+    }
+
+    /// <summary>Charge 2× the item's price (souls = EGold), then grant a temporary enhanced version.</summary>
     public bool TryUpgrade(CCitadelPlayerPawn pawn, string itemName)
     {
-        var price = ShopPriceOf(itemName);
-        var cost = (int)MathF.Round(price * _cfg.UpgradeCostMultiplier);
+        var cost = (int)MathF.Round(ShopPriceOf(itemName) * _cfg.UpgradeCostMultiplier);
 
-        // TODO(P2): confirm ECurrencyType / ModifyCurrency signature and that we can read the
-        // player's balance to gate the purchase.
-        //   if (pawn.GetCurrency(ECurrencyType.Souls) < cost) return false;
-        //   pawn.ModifyCurrency(ECurrencyType.Souls, -cost, ECurrencySource.Purchase);
+        if (pawn.GetCurrency(ECurrencyType.EGold) < cost) return false;
+        // TODO(P0/P2): confirm holding `itemName` before charging (avoid enhancing nothing).
+        pawn.ModifyCurrency(ECurrencyType.EGold, -cost, ECurrencySource.EItemPurchase, spendOnly: true);
 
-        // Swap base → enhanced (the native "enhanced" flag does the heavy lifting).
-        pawn.RemoveItem(itemName);
-        pawn.AddItem(itemName, enhanced: true);
-
-        _ = cost;
+        _enhancements.GrantTemporaryEnhanced(pawn, itemName);
         return true;
     }
 
-    // TODO(P2): source the real per-item shop price (likely from item VData). Hard-coded
-    // fallback until then.
+    // TODO(P2): source the real per-item price from item VData. Hard-coded fallback for now.
     private static int ShopPriceOf(string itemName) => 500;
 }

@@ -40,9 +40,10 @@ Output is a single `BossRush.dll`.
    (≈500 ms debounce), so rebuilds reload live.
 3. In Deadlock's console (F7): `connect localhost:27067`.
 
-> ⚠️ The Deadworks API is *"early development, changes without notice."* If a symbol in
-> `server/BossRush/**` doesn't resolve, check it against your local
-> `managed/DeadworksManaged.Api` and update — the code here is provisional until P0 pins it.
+> ⚠️ The Deadworks API is *"early development, changes without notice."* The scaffold is
+> written against source-verified signatures (`docs/VERIFIED_API.md`) but isn't compiled yet; if
+> a symbol in `server/BossRush/**` doesn't resolve, check it against your local
+> `managed/DeadworksManaged.Api` and update.
 
 ---
 

@@ -7,10 +7,10 @@ audio, props, map edits. Built with **CSDK 12** on Windows and packed into a `pa
 > connect). Keep it as small as possible — push everything else into `server/`.
 
 ## What lives here
-- `panorama/` — custom HUD. Primary job: the **Relics / Enhancements list panel** that shows
-  power held beyond the 16 real item slots (`docs/DESIGN.md` §3 — there is **no** way to add a
-  functional 17th item *slot*, so this is a list panel, not fake slots). Optional later: an
-  Upgrade-Station reskin of the shop.
+- `panorama/` — **optional** custom HUD. Items past the 12 visible slots are *already equipped
+  and functional* under the Street Brawl ruleset (`docs/DESIGN.md` §3); the only gap is that the
+  stock HUD only draws 12. So this panel is an **"owned items" list** that *shows* everything
+  held — not fake functional slots. Optional later: an Upgrade-Station reskin of the shop.
   - Deadlock UI is Valve **Panorama** (`*.xml` layouts, `*.vcss` styles, `*.vjs` scripts).
     Decompile shipped UI with Source 2 Viewer for reference; the "CSS hijack" technique
     (`@import` the base style, override) avoids touching layout where possible.
@@ -26,9 +26,10 @@ tree into a VPK (CS2 Workshop Manager / Multichunk / DeadPacker). 4. Install to
 `Deadlock/game/citadel/addons/` and add `Game citadel/addons` above `Game citadel` in
 `gameinfo.gi`. Details: [`../docs/SETUP.md`](../docs/SETUP.md) §B.
 
-## Hard limits (from research — see `docs/DESIGN.md`)
-- **No 17th item slot.** The inventory is a compiled control driven by server game-state; you
-  cannot add functional slots in XML. Show extra power as a list, not slots.
+## Notes (from research — see `docs/DESIGN.md` & `docs/VERIFIED_API.md`)
+- **Items past 12 work without UI changes** under the Street Brawl ruleset (server-side). You
+  cannot add a functional 13th *slot* in XML, but you don't need to — this HUD only *displays*
+  the already-equipped extras as a list.
 - Custom audio/maps have **no native server→client delivery** — hence the per-player install /
   launcher auto-sync.
 - `gameinfo.gi` edits **reset on every major Deadlock patch**; re-apply after updates.

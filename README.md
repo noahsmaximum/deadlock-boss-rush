@@ -24,9 +24,12 @@ Two coordinated mods (Deadlock has no official custom-games SDK):
 
 - **[`docs/DESIGN.md`](docs/DESIGN.md)** — full spec, a feasibility verdict for every
   mechanic, the architecture, the phased roadmap, and the open decisions.
+- **[`docs/VERIFIED_API.md`](docs/VERIFIED_API.md)** — source-verified Deadworks API reference
+  (signatures, event types, NPC classnames, convars) + the open runtime experiments.
 - **[`docs/SETUP.md`](docs/SETUP.md)** — dev environment, build, run, and packaging.
 
 > ⚠️ Built on **unofficial, early-development** community tooling. Deadworks' APIs change
-> without notice; CSDK/`gameinfo.gi` break on Deadlock patches. The SDK signatures in
-> `server/` are **provisional until verified against a local SDK clone** (roadmap phase P0).
-> Custom servers run outside Valve matchmaking; no official modding policy exists.
+> without notice; CSDK/`gameinfo.gi` break on Deadlock patches. The `server/` scaffold is
+> written against **source-verified signatures** but isn't built/run yet — a handful of things
+> still need a live server (see VERIFIED_API.md §9). Custom servers run outside Valve
+> matchmaking; no official modding policy exists.

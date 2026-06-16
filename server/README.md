@@ -12,8 +12,9 @@ The "brain" of Boss Rush: a single C# plugin (`BossRush.dll`) for the
   - `RageWaveSystem` — 10-min 4× waves, held "until cleared", audio cue.
   - `PatronCombatSystem` — Patron lasers (damage + particle + sound), scaling, random buffs.
   - `LootSystem` — gold-statue/crate pickups → `AddItem`; rare enhanced drops.
-  - `UpgradeStation` — enhance a held item for 2× price.
-  - `RelicSystem` — power beyond the 16-slot cap, as modifiers (see `docs/DESIGN.md` §3).
+  - `UpgradeStation` — enhance a held item for 2× price (`!upgrade <item>`).
+  - `EnhancementSystem` — temporary enhanced items (5 min / until death); items themselves are
+    uncapped under the Street Brawl ruleset (see `docs/DESIGN.md` §3).
 
 ## Build & run
 ```sh
@@ -23,8 +24,9 @@ dotnet build BossRush/BossRush.csproj -c Release \
 ```
 Full steps + prerequisites: [`../docs/SETUP.md`](../docs/SETUP.md).
 
-> ⚠️ **Provisional code.** The SDK is early-development and the signatures here came from
-> reading the public source, not a compile. Treat `using DeadworksManaged.Api;`, method names,
-> and types as *to-be-verified in roadmap phase P0*. The structure is real; the exact calls
-> may need adjusting against your SDK clone. `TODO(Pn)` tags point at the roadmap phase that
-> fills each gap.
+> ⚠️ **Written against source-verified APIs, not yet compiled.** Signatures, event types, NPC
+> classnames, convars, and currency enums were pinned by reading the actual Deadworks source
+> (see `docs/VERIFIED_API.md`) — but the SDK is early-development ("APIs change without notice")
+> and this hasn't been built against your local SDK yet. `TODO(P0)` marks the few things that
+> still need a *running server* to confirm (e.g. runtime NPC spawning, EntityTouch member names,
+> enabling the Street Brawl uncapped-items ruleset). `TODO(Pn)` tags map to roadmap phases.
