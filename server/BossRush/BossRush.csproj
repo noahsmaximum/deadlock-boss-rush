@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Deadworks plugin = a .NET 10 class library DLL dropped into the server's plugins/ dir.
+    The Deadworks SDK is NOT vendored; point at a local clone via:
+      dotnet build -p:DeadworksSdk=C:/path/to/deadworks/managed/DeadworksManaged.Api
+    (see docs/SETUP.md). APIs are early-development and change without notice.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>BossRush</AssemblyName>
+    <RootNamespace>BossRush</RootNamespace>
+    <!-- Plugin DLL only; the SDK assembly is provided by the running server. -->
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(DeadworksSdk)' == ''">
+    <!-- Default guess; override on the command line. -->
+    <DeadworksSdk>$(MSBuildThisFileDirectory)../../../deadworks/managed/DeadworksManaged.Api</DeadworksSdk>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Prefer a ProjectReference if you build the SDK in the same solution; otherwise
+      reference the built DeadworksManaged.Api.dll. Adjust to match your SDK layout.
+    -->
+    <ProjectReference Include="$(DeadworksSdk)/DeadworksManaged.Api.csproj"
+                      Condition="Exists('$(DeadworksSdk)/DeadworksManaged.Api.csproj')"
+                      Private="false" />
+    <Reference Include="DeadworksManaged.Api"
+               Condition="!Exists('$(DeadworksSdk)/DeadworksManaged.Api.csproj') And Exists('$(DeadworksSdk)/DeadworksManaged.Api.dll')">
+      <HintPath>$(DeadworksSdk)/DeadworksManaged.Api.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
