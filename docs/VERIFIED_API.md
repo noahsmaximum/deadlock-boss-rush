@@ -143,6 +143,16 @@ The pitch's "no item limit" is a **real, supported** capability, not a wall:
   custom HUD list, optional).
 
 ## 9. Open P0 experiments (need a running server — do these on the Windows box)
+
+> **Tooling:** the plugin ships dev commands to run these fast — `br_dumpents` (dump every
+> entity's designer name → answers the spawn-classname questions), `br_nearby`, `br_pos`
+> (record coordinates), `br_gamestate` (confirms the active game mode). See `Systems/DevTools.cs`.
+>
+> **Blocker (2026-06-16):** `deadworks.exe` aborts with *"Failed to find signature
+> CCitadelPlayerPawn::AbilityThink"* — Deadworks' signatures (last refreshed upstream May 22)
+> don't match the **June 11 Deadlock build**. The plugin compiles & deploys fine; the live
+> test is gated on Deadworks publishing June-build sigs (or pinning Deadlock to a late-May/
+> early-June build). The runtime sig file is `<Deadlock>\game\citadel\cfg\deadworks_mem.jsonc`.
 1. **Enable unlimited items:** confirm how StreetBrawl is set on a Deadworks dedicated server
    (launch arg / map / convar / writing `m_eGameMode`), and that `AddItem` past slot 12 then
    succeeds. (Fallback: investigate any item-cap convar.)
