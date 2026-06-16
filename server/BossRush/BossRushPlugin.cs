@@ -90,8 +90,9 @@ public sealed class BossRushPlugin : DeadworksPluginBase
     [GameEventHandler("player_death")]
     public HookResult OnPlayerDeath(PlayerDeathEvent args)
     {
-        // Timed enhancements end on death (DESIGN.md #8).
-        if (args.UseridPawn is { } victim)
+        // Timed enhancements end on death (DESIGN.md #8). UseridPawn is the base pawn type;
+        // convert to the Citadel pawn the way the example plugins do.
+        if (args.UseridPawn?.As<CCitadelPlayerPawn>() is { } victim)
             _enhancements.OnPlayerDeath(victim);
         return HookResult.Continue;
     }
