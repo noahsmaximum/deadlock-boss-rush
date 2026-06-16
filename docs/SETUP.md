@@ -116,3 +116,27 @@ can auto-deliver the addon to clients on connect.
 | Join | console (F7): `connect localhost:27067` |
 
 See `docs/DESIGN.md` for the spec/roadmap and `docs/VERIFIED_API.md` for the API + P0 experiments.
+
+---
+
+## D. Coexisting with normal online play & Steam updates
+
+Building/running the server in the Deadlock install dir is safe to combine with normal play, as
+long as you keep these straight:
+
+- **Normal matchmaking is unaffected.** Deadworks adds *extra* files (`deadworks.exe`, native
+  DLLs, `managed\plugins\BossRush.dll`) next to the game; it doesn't patch the stock client or
+  its VPKs. Launch via Steam as usual → normal Valve matchmaking.
+- **Keep Steam launch options clean.** Only add insecure/lobby flags when launching specifically
+  to test the *local* server; that applies to that one launch and is reversible. Don't run
+  `deadworks.exe` during a matchmaking session.
+- **Ban posture (unchanged):** custom servers run `-insecure` (outside VAC); no bans reported
+  for custom servers / cosmetic mods, but no official Valve policy — never load gameplay mods
+  into a VAC matchmaking session.
+- **Your work survives updates** because all *source* lives in git (this repo + the `C:\deadworks`
+  clone); only regenerable build outputs sit in the install dir. A Deadlock patch will usually
+  **break the custom server until Deadworks is rebuilt/resynced** to the new game version (see
+  `scripts/update-protos.py` / `update-game-exported.py`) — a maintenance cost, not data loss.
+- **Avoid "Verify integrity of game files"** unless cleaning up — it deletes the added server
+  files (rebuild to restore). Client-side `gameinfo.gi` edits (future `client/` work) reset on
+  every major patch; re-apply after updates.
