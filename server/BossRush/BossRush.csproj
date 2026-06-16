@@ -1,41 +1,41 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Deadworks plugin = a .NET 10 class library DLL dropped into the server's plugins/ dir.
-    The Deadworks SDK is NOT vendored; point at a local clone via:
-      dotnet build -p:DeadworksSdk=C:/path/to/deadworks/managed/DeadworksManaged.Api
-    (see docs/SETUP.md). APIs are early-development and change without notice.
+    Boss Rush = a Deadworks plugin (a .NET 10 class library DLL). This csproj mirrors the
+    shipped example plugins exactly (see TagPlugin.csproj). Build model (docs/SETUP.md §A):
+
+      Junction this folder into your Deadworks clone:
+        mklink /J <deadworks>\examples\plugins\BossRush <thisRepo>\server\BossRush
+
+    Then the relative SDK ProjectReference and the auto-deploy below resolve just like the
+    examples: DeadlockManagedDir is provided by <deadworks>\examples\Directory.Build.props,
+    which reads DeadlockDir from your local.props. On Build, BossRush.dll is copied to
+    <DeadlockDir>\managed\plugins\ and hot-reloaded by a running server.
   -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>BossRush</AssemblyName>
     <RootNamespace>BossRush</RootNamespace>
-    <!-- Plugin DLL only; the SDK assembly is provided by the running server. -->
-    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(DeadworksSdk)' == ''">
-    <!-- Default guess; override on the command line. -->
-    <DeadworksSdk>$(MSBuildThisFileDirectory)../../../deadworks/managed/DeadworksManaged.Api</DeadworksSdk>
   </PropertyGroup>
 
   <ItemGroup>
-    <!--
-      Prefer a ProjectReference if you build the SDK in the same solution; otherwise
-      reference the built DeadworksManaged.Api.dll. Adjust to match your SDK layout.
-    -->
-    <ProjectReference Include="$(DeadworksSdk)/DeadworksManaged.Api.csproj"
-                      Condition="Exists('$(DeadworksSdk)/DeadworksManaged.Api.csproj')"
-                      Private="false" />
-    <Reference Include="DeadworksManaged.Api"
-               Condition="!Exists('$(DeadworksSdk)/DeadworksManaged.Api.csproj') And Exists('$(DeadworksSdk)/DeadworksManaged.Api.dll')">
-      <HintPath>$(DeadworksSdk)/DeadworksManaged.Api.dll</HintPath>
+    <ProjectReference Include="..\..\..\managed\DeadworksManaged.Api\DeadworksManaged.Api.csproj">
       <Private>false</Private>
-    </Reference>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
   </ItemGroup>
+
+  <Target Name="DeployToGame" AfterTargets="Build" Condition="'$(DeadlockManagedDir)' != ''">
+    <ItemGroup>
+      <DeployFiles Include="$(OutputPath)BossRush.dll;$(OutputPath)BossRush.pdb" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(DeadlockManagedDir)\plugins"
+          SkipUnchangedFiles="false" Retries="0" ContinueOnError="WarnAndContinue" />
+  </Target>
 
 </Project>
