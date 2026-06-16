@@ -1,0 +1,24 @@
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Deadworks SDK is referenced from a local clone, never vendored here
+# (set -p:DeadworksSdk=/path/to/deadworks/managed/DeadworksManaged.Api)
+
+# Compiled Source 2 client assets / packed addons (build artifacts, not source)
+*.vpk
+*_c
+*.vxml_c
+*.vcss_c
+*.vjs_c
+*.vsnd_c
+*.vdata_c
+client/**/compiled/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp

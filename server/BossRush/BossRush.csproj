@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Boss Rush = a Deadworks plugin (a .NET 10 class library DLL). This csproj mirrors the
+    shipped example plugins exactly (see TagPlugin.csproj). Build model (docs/SETUP.md §A):
+
+      Junction this folder into your Deadworks clone:
+        mklink /J <deadworks>\examples\plugins\BossRush <thisRepo>\server\BossRush
+
+    Then the relative SDK ProjectReference and the auto-deploy below resolve just like the
+    examples: DeadlockManagedDir is provided by <deadworks>\examples\Directory.Build.props,
+    which reads DeadlockDir from your local.props. On Build, BossRush.dll is copied to
+    <DeadlockDir>\managed\plugins\ and hot-reloaded by a running server.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>BossRush</AssemblyName>
+    <RootNamespace>BossRush</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\managed\DeadworksManaged.Api\DeadworksManaged.Api.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Target Name="DeployToGame" AfterTargets="Build" Condition="'$(DeadlockManagedDir)' != ''">
+    <ItemGroup>
+      <DeployFiles Include="$(OutputPath)BossRush.dll;$(OutputPath)BossRush.pdb" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(DeadlockManagedDir)\plugins"
+          SkipUnchangedFiles="false" Retries="0" ContinueOnError="WarnAndContinue" />
+  </Target>
+
+</Project>
