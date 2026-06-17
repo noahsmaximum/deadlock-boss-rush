@@ -233,4 +233,16 @@ public sealed partial class BossRushPlugin
         Console.WriteLine(msg);
         Chat.PrintToChat(caller, msg);
     }
+
+    [Command("br_additem", Description = "Give yourself an item by internal name — test which moves the HUD regen stat (dev)")]
+    public void CmdAddItem(CCitadelPlayerController caller, string itemName, string enhanced = "")
+    {
+        var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
+        if (pawn == null) return;
+        bool enh = enhanced is "1" or "true" or "enhanced";
+        var item = pawn.AddItem(itemName, enh);
+        var msg = $"[Boss Rush] AddItem('{itemName}', enhanced={enh}) => {(item != null ? item.ToString() : "NULL (bad name?)")}";
+        Console.WriteLine(msg);
+        Chat.PrintToChat(caller, msg);
+    }
 }
