@@ -77,6 +77,14 @@ public sealed class BossRushConfig
     public float BossUltAoeRadius { get; set; } = 600.0f;
     /// <summary>Extra ult damage added per health bar already lost.</summary>
     public float BossUltDamagePerBar { get; set; } = 30.0f;
+    /// <summary>Max distance (units) a hero can be from the King and still be attacked — stops whole-map hits.</summary>
+    public float BossEngageRange { get; set; } = 3000.0f;
+    /// <summary>Fire the Patron's REAL native abilities (citadel_ability_tier3boss_*) instead of simulated effects. Off until confirmed in-game via dw_br_bosscast.</summary>
+    public bool BossUseNativeAbilities { get; set; } = false;
+    /// <summary>Hits per barrage ult (McGinnis / drop-bombs), staggered over time.</summary>
+    public int BossBarrageHits { get; set; } = 4;
+    /// <summary>Seconds between barrage hits.</summary>
+    public float BossBarrageIntervalSeconds { get; set; } = 0.35f;
     /// <summary>CC modifier for the "Rem — Naptime" sleep ult. Placeholder — real Deadlock sleep/stun TBD (decision #6).</summary>
     public string BossSleepModifier { get; set; } = "modifier_bossrush_sleep";
 

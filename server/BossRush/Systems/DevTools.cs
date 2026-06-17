@@ -265,7 +265,7 @@ public sealed partial class BossRushPlugin
             Console.WriteLine($"  {e.DesignerName}  (class {e.Classname}, team {e.TeamNum}, hp {e.Health}, handle {e.EntityHandle})");
     }
 
-    [Command("br_bossult", Description = "Fire one Hidden King ult now (dev). index: 0=laser 1=lightning 2=barrage 3=sleep")]
+    [Command("br_bossult", Description = "Fire one Hidden King ult now (dev). index: 0=laser 1=storm 2=barrage 3=bombs 4=sleep")]
     public void CmdBossUlt(CCitadelPlayerController? caller = null, string index = "0")
     {
         if (!int.TryParse(index, out var i)) i = 0;
@@ -297,6 +297,26 @@ public sealed partial class BossRushPlugin
         }
 
         var msg = $"[Boss Rush] sent '{input}' to {targets.Count} ent(s) matching '{substr}'";
+        Console.WriteLine(msg);
+        if (caller != null) Chat.PrintToChat(caller, msg);
+    }
+
+    [Command("br_bosscast", Description = "Fire the Hidden King's REAL native ability via ToggleActivate (dev). e.g. br_bosscast rocket_barrage")]
+    public void CmdBossCast(CCitadelPlayerController? caller = null, string abilitySubstr = "laser")
+    {
+        var msg = $"[Boss Rush] {_patron.DebugCastNative(abilitySubstr)}";
+        Console.WriteLine(msg);
+        if (caller != null) Chat.PrintToChat(caller, msg);
+    }
+
+    [Command("br_bosspromote", Description = "Target the existing team-2 Patron as the Hidden King (resize hp if given) — no duplicate spawn (dev)")]
+    public void CmdBossPromote(CCitadelPlayerController? caller = null, string hp = "0")
+    {
+        if (!int.TryParse(hp, out var hpVal)) hpVal = 0;
+        bool ok = _patron.DebugPromote(hpVal);
+        var msg = ok
+            ? $"[Boss Rush] promoted enemy Patron. {_patron.DebugStatus()}"
+            : "[Boss Rush] no team-2 Patron found to promote.";
         Console.WriteLine(msg);
         if (caller != null) Chat.PrintToChat(caller, msg);
     }
