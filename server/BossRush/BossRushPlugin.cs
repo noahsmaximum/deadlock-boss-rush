@@ -33,7 +33,6 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     private PatronCombatSystem _patron = null!;
     private LootSystem _loot = null!;
     private UpgradeStation _upgrades = null!;
-    private HealthDropSystem _healthDrops = null!;
 
     public override void OnLoad(bool isReload)
     {
@@ -43,7 +42,6 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         _patron = new PatronCombatSystem(Config, Timer);
         _loot = new LootSystem(Config, _enhancements);
         _upgrades = new UpgradeStation(Config, _enhancements);
-        _healthDrops = new HealthDropSystem(Config);
 
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
@@ -87,8 +85,27 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         // Buying happens at Upgrade Stations, not anywhere — but allow for now while prototyping.
         ConVar.Find("citadel_allow_purchasing_anywhere")?.SetInt(1);
         ConVar.Find("citadel_allow_duplicate_heroes")?.SetInt(1);
+
+        // Forced health regen for sustain, at a quarter of the default rate.
+        ConVar.Find("sv_regeneration_force_on")?.SetInt(1);
+        SetRegenRateFraction(Config.RegenRateFraction);
+
         // TODO(P0): enable StreetBrawl ruleset (uncapped items). Mechanism TBD on a live server
         // (launch arg / map / convar / writing GameRules m_eGameMode) — see VERIFIED_API.md §9.
+    }
+
+    private static float? _baseRegenRate;
+
+    /// <summary>
+    /// Set <c>sv_regeneration_rate</c> to <paramref name="fraction"/> of its default. The default is
+    /// captured once (before we change it) so re-applying on each map load doesn't compound.
+    /// </summary>
+    private static void SetRegenRateFraction(float fraction)
+    {
+        var rate = ConVar.Find("sv_regeneration_rate");
+        if (rate == null) return;
+        _baseRegenRate ??= rate.GetFloat();
+        rate.SetFloat(_baseRegenRate.Value * fraction);
     }
 
     public override void OnPrecacheResources()
@@ -106,19 +123,6 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         // convert to the Citadel pawn the way the example plugins do.
         if (args.UseridPawn?.As<CCitadelPlayerPawn>() is { } victim)
             _enhancements.OnPlayerDeath(victim);
-        return HookResult.Continue;
-    }
-
-    /// <summary>Hidden King creeps drop a health pickup when they die (~1/8 a medic's rate).</summary>
-    [GameEventHandler("entity_killed")]
-    public HookResult OnEntityKilled(GameEvent e)
-    {
-        var victim = CBaseEntity.FromIndex(e.GetInt("entindex_killed"));
-        if (victim != null && victim.TeamNum == EnemyTeam &&
-            victim.DesignerName.Contains("trooper", StringComparison.OrdinalIgnoreCase))
-        {
-            _healthDrops.OnEnemyTrooperKilled(victim.Position);
-        }
         return HookResult.Continue;
     }
 
