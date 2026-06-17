@@ -210,4 +210,27 @@ public sealed partial class BossRushPlugin
         Console.WriteLine(msg);
         if (caller != null) Chat.PrintToChat(caller, msg);
     }
+
+    [Command("br_heal", Description = "Test healing yourself by N — reports Heal() vs direct set (dev)")]
+    public void CmdHeal(CCitadelPlayerController caller, string amount = "200")
+    {
+        var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
+        if (pawn == null) return;
+        if (!float.TryParse(amount, out var amt)) amt = 200f;
+
+        int before = pawn.Health;
+        int healed = pawn.Heal(amt);
+        int afterHeal = pawn.Health;
+
+        string viaSet = "";
+        if (afterHeal == before) // Heal() did nothing — try a direct schema write
+        {
+            pawn.Health = Math.Min(before + (int)amt, pawn.MaxHealth);
+            viaSet = $"; directSet -> {pawn.Health}";
+        }
+
+        var msg = $"[Boss Rush] hp {before}/{pawn.MaxHealth}; Heal({amt}) returned {healed} -> {afterHeal}{viaSet}";
+        Console.WriteLine(msg);
+        Chat.PrintToChat(caller, msg);
+    }
 }
