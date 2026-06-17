@@ -4,23 +4,21 @@ namespace BossRush;
 
 /// <summary>
 /// DESIGN.md #12 — every <see cref="BossRushConfig.RageWaveIntervalMinutes"/> minutes the Hidden
-/// King floods the lanes: we temporarily crank the trooper wave cvars (squad size up, spawn
-/// interval down) so the lane spawners pour troopers out for the surge, announce it, then restore
-/// the normal cadence.
+/// King floods its lanes: for the surge we burst extra Hidden King troopers down the lanes (via the
+/// zipline spawner) every <see cref="BossRushConfig.RageWaveSpawnIntervalSeconds"/>, announce it, and
+/// stop after <see cref="BossRushConfig.RageWaveSurgeDurationSeconds"/>.
 ///
-/// Squad size starts at <see cref="BossRushConfig.RageWaveSquadBase"/> (10) and steps up by
+/// Squad size per burst starts at <see cref="BossRushConfig.RageWaveSquadBase"/> (10) and steps up by
 /// <see cref="BossRushConfig.RageWaveSquadStep"/> (5) at minute
-/// <see cref="BossRushConfig.RageWaveSquadFirstStepMinute"/> (20), then again every
+/// <see cref="BossRushConfig.RageWaveSquadFirstStepMinute"/> (20), then every
 /// <see cref="BossRushConfig.RageWaveSquadStepMinutes"/> (10) → 10 / 15@20m / 20@30m / 25@40m …
 /// </summary>
 public sealed class RageWaveSystem
 {
-    // Game defaults to restore after a surge (citadel_trooper_*): squad 4, early/late 30/25s.
-    private const int BaseSquad = 4, BaseIntervalEarly = 30, BaseIntervalLate = 25;
-
     private readonly BossRushConfig _cfg;
     private readonly ITimer _timer;
     private IHandle? _loop;
+    private IHandle? _surgeBurst;
     private IHandle? _surgeEnd;
     public bool RageActive { get; private set; }
 
@@ -39,8 +37,8 @@ public sealed class RageWaveSystem
     public void Stop()
     {
         _loop?.Cancel(); _loop = null;
+        _surgeBurst?.Cancel(); _surgeBurst = null;
         _surgeEnd?.Cancel(); _surgeEnd = null;
-        if (RageActive) RestoreCadence();
         RageActive = false;
     }
 
@@ -55,7 +53,9 @@ public sealed class RageWaveSystem
         Announce("RAGE WAVE", "The Hidden King floods the lanes — survive the surge!");
         PlayRageSoundForEveryone();
 
-        SetCadence(SquadSizeForNow(), _cfg.RageWaveSpawnIntervalSeconds);
+        SpawnBurst(); // immediate, then repeat through the surge
+        _surgeBurst?.Cancel();
+        _surgeBurst = _timer.Every(((int)_cfg.RageWaveSpawnIntervalSeconds).Seconds(), SpawnBurst);
 
         _surgeEnd?.Cancel();
         _surgeEnd = _timer.Once(((int)_cfg.RageWaveSurgeDurationSeconds).Seconds(), EndWave);
@@ -65,10 +65,13 @@ public sealed class RageWaveSystem
     {
         if (!RageActive) return;
         RageActive = false;
+        _surgeBurst?.Cancel(); _surgeBurst = null;
         _surgeEnd?.Cancel(); _surgeEnd = null;
-        RestoreCadence();
         Announce("Wave cleared", "The surge subsides… for now.");
     }
+
+    private void SpawnBurst() =>
+        LaneTroopers.Spawn(BossRushPlugin.EnemyTeam, SquadSizeForNow(), _cfg.HiddenKingLanesCsv);
 
     /// <summary>10 to start; +step at the first-step minute and again every step interval after.</summary>
     private int SquadSizeForNow()
@@ -81,20 +84,6 @@ public sealed class RageWaveSystem
             squad += _cfg.RageWaveSquadStep * steps;
         }
         return squad;
-    }
-
-    private static void SetCadence(int squad, float intervalSeconds)
-    {
-        ConVar.Find("citadel_trooper_squad_size")?.SetInt(squad);
-        ConVar.Find("citadel_trooper_spawn_interval_early")?.SetFloat(intervalSeconds);
-        ConVar.Find("citadel_trooper_spawn_interval_late")?.SetFloat(intervalSeconds);
-    }
-
-    private static void RestoreCadence()
-    {
-        ConVar.Find("citadel_trooper_squad_size")?.SetInt(BaseSquad);
-        ConVar.Find("citadel_trooper_spawn_interval_early")?.SetFloat(BaseIntervalEarly);
-        ConVar.Find("citadel_trooper_spawn_interval_late")?.SetFloat(BaseIntervalLate);
     }
 
     private void PlayRageSoundForEveryone()
