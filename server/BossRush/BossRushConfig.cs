@@ -25,9 +25,11 @@ public sealed class BossRushConfig
     /// <summary>Extra denizen strength added per minute of match time (linear scaling).</summary>
     public float DenizenStrengthPerMinute { get; set; } = 0.04f;
 
-    // ── Health regen (sv_regeneration_force_on) ───────────────────────────────────
-    /// <summary>Fraction of the default sv_regeneration_rate to apply (0.25 = a quarter).</summary>
-    public float RegenRateFraction { get; set; } = 0.25f;
+    // ── Health regen (custom; sv_regeneration_force_on has no rate cvar) ──────────
+    /// <summary>HP/sec the heroes passively regen — hero-only, tunable (the cheat's rate can't be slowed). Dial to ~1/4 the cheat's feel.</summary>
+    public float RegenPerSecond { get; set; } = 6.0f;
+    /// <summary>Regen pauses this many seconds after a hero takes damage.</summary>
+    public float RegenWaitSeconds { get; set; } = 5.0f;
 
     // ── Rage waves (DESIGN.md #12) ────────────────────────────────────────────────
     /// <summary>Minutes between automatic rage waves.</summary>
