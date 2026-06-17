@@ -143,6 +143,26 @@ The pitch's "no item limit" is a **real, supported** capability, not a wall:
   custom HUD list, optional).
 
 ## 9. Open P0 experiments (need a running server — do these on the Windows box)
+
+> **Tooling:** the plugin ships dev commands to run these fast — `br_dumpents` (dump every
+> entity's designer name → answers the spawn-classname questions), `br_nearby`, `br_pos`
+> (record coordinates), `br_gamestate` (confirms the active game mode). See `Systems/DevTools.cs`.
+>
+> **Sig fix (2026-06-16):** the May-22 `CCitadelPlayerPawn::AbilityThink` pattern
+> (`48 89 4C 24 ?? 55 53 56 41 55 41 57`) no longer matches the **June-11 Deadlock build**.
+> Replace it in `<Deadlock>\game\citadel\cfg\deadworks_mem.jsonc` (and source
+> `config/deadworks_mem.jsonc`) with the community PR pattern
+> `40 55 53 41 54 41 55 41 57 48 8D AC 24`. Deadworks then hooks AbilityThink and boots .NET.
+>
+> **Deploy fix (2026-06-16):** after the sig fix, `deadworks.exe` crashes at map load with an
+> unhandled CLR `System.IO.FileNotFoundException` for `Google.Protobuf, Version=3.29.3.0`
+> (minidump exception code `0xE0434352` = managed exception, raised in KERNELBASE; not a native
+> AV). Cause: `DeployToGame` in `managed/DeadworksManaged.csproj` copies the managed DLLs but
+> **omits their `Google.Protobuf` dependency**, so the protobuf game-session-manifest build has
+> no `Google.Protobuf.dll` to load. Fix: copy `Google.Protobuf.dll` (3.29.3, net8.0) into
+> `<Deadlock>\game\bin\win64\managed\`, or add `$(OutputPath)Google.Protobuf.dll` to the
+> `DeployFiles` list and rebuild. The crash happens before any plugin `OnLoad` — it is a
+> Deadworks deployment gap, not plugin code.
 1. **Enable unlimited items:** confirm how StreetBrawl is set on a Deadworks dedicated server
    (launch arg / map / convar / writing `m_eGameMode`), and that `AddItem` past slot 12 then
    succeeds. (Fallback: investigate any item-cap convar.)

@@ -12,7 +12,7 @@ namespace BossRush;
 /// rely on the Street Brawl ruleset (no item-slot limit); confirming how that's enabled on the
 /// server is P0 experiment #1.
 /// </summary>
-public sealed class BossRushPlugin : DeadworksPluginBase
+public sealed partial class BossRushPlugin : DeadworksPluginBase
 {
     public override string Name => "Boss Rush";
 
@@ -43,6 +43,7 @@ public sealed class BossRushPlugin : DeadworksPluginBase
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
             : "[Boss Rush] loaded. Loot the lanes. Kill the Patron.");
+        Console.WriteLine("[Boss Rush] dev commands: br_dumpents, br_nearby, br_pos, br_gamestate");
     }
 
     public override void OnUnload()
