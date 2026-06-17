@@ -33,23 +33,23 @@ public sealed class SpawnDirector
         _reinforce = null;
     }
 
-    /// <summary>Steady stream of extra Hidden King troopers down their lanes (keeps them ~2× the Archmother).</summary>
+    /// <summary>Steady stream of extra Hidden King troopers down every lane (keeps them ~2× the Archmother).</summary>
     private void Reinforce() =>
-        LaneTroopers.Spawn(BossRushPlugin.EnemyTeam, _cfg.ReinforcementSquadSize, _cfg.HiddenKingLanesCsv);
+        LaneTroopers.SpawnPerLane(BossRushPlugin.EnemyTeam, _cfg.ReinforcementSquadSize, _cfg.HiddenKingLanesCsv);
 
     /// <summary>Buff the Hidden King's lane troopers as they spawn, scaling with match time.</summary>
     public void OnEntitySpawned(EntitySpawnedEvent e)
     {
         var ent = e.Entity;
-        if (ent.TeamNum != BossRushPlugin.EnemyTeam) return;
         if (!ent.DesignerName.Contains("trooper", StringComparison.OrdinalIgnoreCase)) return;
 
-        // Defer one tick so the trooper's health is initialized before we scale it.
+        // Team and health are assigned a tick after the spawn event fires — defer the check + buff.
         uint handle = ent.EntityHandle;
         _timer.NextTick(() =>
         {
             var t = CBaseEntity.FromHandle(handle);
             if (t == null || !t.IsAlive || t.MaxHealth <= 0) return;
+            if (t.TeamNum != BossRushPlugin.EnemyTeam) return;
 
             float minutes = GameRules.GameClock / 60f;
             float mult = _cfg.DenizenBaseStrengthMultiplier + _cfg.DenizenStrengthPerMinute * minutes;

@@ -71,7 +71,7 @@ public sealed class RageWaveSystem
     }
 
     private void SpawnBurst() =>
-        LaneTroopers.Spawn(BossRushPlugin.EnemyTeam, SquadSizeForNow(), _cfg.HiddenKingLanesCsv);
+        LaneTroopers.SpawnAcross(BossRushPlugin.EnemyTeam, SquadSizeForNow(), _cfg.HiddenKingLanesCsv);
 
     /// <summary>10 to start; +step at the first-step minute and again every step interval after.</summary>
     private int SquadSizeForNow()

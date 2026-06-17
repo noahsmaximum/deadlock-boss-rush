@@ -9,18 +9,18 @@ public sealed class BossRushConfig
     // ── Spawning (DESIGN.md #9, #10) ──────────────────────────────────────────────
     /// <summary>
     /// Hidden King lane indices for <c>citadel_spawn_trooper_zipline &lt;team&gt; &lt;lane&gt;</c>.
-    /// Map-specific — confirm in-game (e.g. <c>dw_br_run citadel_spawn_trooper_zipline 2 1</c>) and trim.
+    /// dl_midtown (confirmed in-game): 1 = left, 4 = middle, 6 = right.
     /// </summary>
-    public string HiddenKingLanesCsv { get; set; } = "1,2,3,4";
+    public string HiddenKingLanesCsv { get; set; } = "1,4,6";
 
     /// <summary>Seconds between baseline Hidden King reinforcement spawns (~ the natural wave cadence).</summary>
     public float ReinforcementIntervalSeconds { get; set; } = 30.0f;
 
-    /// <summary>Extra Hidden King troopers spawned each reinforcement — keeps the Hidden King ahead of the Archmother (~2×).</summary>
+    /// <summary>Extra Hidden King troopers spawned on EACH lane per reinforcement — keeps the Hidden King ahead of the Archmother (~2×).</summary>
     public int ReinforcementSquadSize { get; set; } = 4;
 
     /// <summary>Enemy troopers start this much stronger than baseline (health), scaling with match time.</summary>
-    public float DenizenBaseStrengthMultiplier { get; set; } = 1.5f;
+    public float DenizenBaseStrengthMultiplier { get; set; } = 2.0f;
 
     /// <summary>Extra denizen strength added per minute of match time (linear scaling).</summary>
     public float DenizenStrengthPerMinute { get; set; } = 0.04f;
