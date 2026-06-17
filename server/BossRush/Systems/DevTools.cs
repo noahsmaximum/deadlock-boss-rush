@@ -103,11 +103,26 @@ public sealed partial class BossRushPlugin
             Chat.PrintToChat(caller, s);
     }
 
+    // Designer names that crash native Spawn() when created standalone: they need the game's
+    // lane/spawner context (CCitadelTrooper derefs a null lane). Refuse rather than AV the server.
+    private static readonly HashSet<string> UnsafeToSpawn = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "npc_trooper", "npc_super_trooper",
+    };
+
     [Command("br_spawn", Description = "Spawn one entity by designer name in front of you (dev)")]
-    public void CmdSpawn(CCitadelPlayerController caller, string designerName, string team = "3")
+    public void CmdSpawn(CCitadelPlayerController caller, string designerName, string team = "3", string hp = "")
     {
         var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
         if (pawn == null) return;
+
+        if (UnsafeToSpawn.Contains(designerName))
+        {
+            Chat.PrintToChat(caller,
+                $"[Boss Rush] '{designerName}' needs the lane spawner — a direct spawn crashes the server; skipped.");
+            return;
+        }
+
         if (!int.TryParse(team, out var teamNum)) teamNum = BossRushPlugin.EnemyTeam;
 
         // Place it ~200u in front of where you're facing, lifted off the ground a touch.
@@ -128,6 +143,13 @@ public sealed partial class BossRushPlugin
         ent.TeamNum = teamNum;
         ent.Teleport(position: origin);
         ent.Spawn();
+
+        // Optional hp override — neutrals spawn at 1 hp, so let dev tests make them a real threat.
+        if (int.TryParse(hp, out var hpVal) && hpVal > 0)
+        {
+            ent.MaxHealth = hpVal;
+            ent.Health = hpVal;
+        }
 
         var msg = $"[Boss Rush] spawned '{designerName}' -> class {ent.Classname}, team {teamNum}, " +
                   $"valid={ent.IsValid}, hp={ent.Health}/{ent.MaxHealth} at {origin.X:F0},{origin.Y:F0},{origin.Z:F0}";

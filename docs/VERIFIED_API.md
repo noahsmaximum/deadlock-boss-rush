@@ -204,3 +204,28 @@ Captured with `dw_br_dumpents` on a dedicated server at `state=Init` (no players
   `dw_br_dumpents` *after* a client connects and the match starts.
 - Full per-entity positions (spawn points, shops, lanes) live in the JSON dump
   (`~\deadlock_dumps\entdump_*.json`) for baking into config.
+
+---
+
+## 11. Runtime spawn results — `CreateByDesignerName` + `Spawn()` (2026-06-16, live)
+
+Tested with `dw_br_spawn` against a connected hero. Spawn path:
+`CBaseEntity.CreateByDesignerName(name)` → set `TeamNum` → `Teleport(pos)` → `Spawn()`.
+
+| Designer name | Result |
+|---|---|
+| `npc_boss_tier3` | ✅ **= the Patron.** Spawns, attacks, and **killing it wins the match** (native win condition). Brings child ability ents `citadel_ability_tier3boss_laser_beam` + `citadel_ability_tier3boss_aoe_wave` → no custom laser particle needed. |
+| `npc_barrack_boss` | ✅ Guardian (`CNPC_BarrackBoss`). Spawns clean. |
+| `npc_neutral_bug` | ✅ Spawns (`CNPC_Neutral_Bug`) but at **hp 1/1** — set `MaxHealth`/`Health` after spawn to make it a threat. |
+| `npc_trooper` | ❌ **Crashes the server** — `0xC0000005` AV inside native `CBaseEntity.Spawn()`. Lane troopers need the game's lane/spawner context (null lane deref). A native AV can't be caught in managed → process dies. Do **not** raw-spawn; `br_spawn` now refuses `npc_trooper`/`npc_super_trooper`. |
+
+**Implications for the mode:**
+- Build waves from entities that spawn cleanly (bosses / `npc_barrack_boss` / neutrals), not raw
+  lane troopers. Fits a "Boss Rush" better anyway.
+- `npc_boss_tier3` is the finale: spawning + killing it is the win, for free.
+- Set health on spawned enemies (neutrals are 1 hp).
+- `EGameState` values observed: 2=WaitingForPlayersToJoin, 3=HeroSelection, 4=MatchIntro,
+  5=WaitForMapToLoad, 6=PreGameWait, 7=GameInProgress. `CNPC_Boss_Tier3` has `m_ePhase`
+  (ETier3Phase_t) + `m_eAliveState` (ETier3State_t).
+- **Still open:** spawning real lane troopers safely (needs the game's trooper spawner, not
+  `CreateByDesignerName`); the `npc_barrack_boss`/boss tier1/tier2 ladder; tuning health/teams.
