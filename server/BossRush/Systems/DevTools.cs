@@ -181,4 +181,18 @@ public sealed partial class BossRushPlugin
         foreach (var c in cvars.Take(80))
             Console.WriteLine($"  [var] {c.Name} = {c.Value}  -  {c.Description}");
     }
+
+    [Command("br_run", Description = "Run a console command in your player context w/ sv_cheats (dev). Quote multi-word commands.")]
+    public void CmdRun(CCitadelPlayerController caller, string command)
+    {
+        // Cheat-gated server commands (citadel_spawn_trooper, npc_create, ...) won't run when a
+        // player types them, but the server can issue them on the player's behalf. Force sv_cheats
+        // server-side, then run in the caller's context so "in front of the player" resolves.
+        ConVar.Find("sv_cheats")?.SetInt(1);
+        Server.ClientCommand(caller.Slot, command);
+
+        var msg = $"[Boss Rush] ran as slot {caller.Slot}: {command}";
+        Console.WriteLine(msg);
+        Chat.PrintToChat(caller, msg);
+    }
 }

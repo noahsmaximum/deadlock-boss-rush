@@ -43,7 +43,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
             : "[Boss Rush] loaded. Loot the lanes. Kill the Patron.");
-        Console.WriteLine("[Boss Rush] dev commands: br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds");
+        Console.WriteLine("[Boss Rush] dev commands: br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run");
     }
 
     public override void OnUnload()

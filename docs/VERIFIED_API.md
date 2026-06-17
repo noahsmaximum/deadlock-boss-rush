@@ -229,3 +229,30 @@ Tested with `dw_br_spawn` against a connected hero. Spawn path:
   (ETier3Phase_t) + `m_eAliveState` (ETier3State_t).
 - **Still open:** spawning real lane troopers safely (needs the game's trooper spawner, not
   `CreateByDesignerName`); the `npc_barrack_boss`/boss tier1/tier2 ladder; tuning health/teams.
+
+---
+
+## 12. Native lane-trooper spawning & control (found via `dw_br_cmds`, 2026-06-16)
+
+The marching **wave troopers** (which fight) — not the idle denizens — are spawned by the game's
+own console commands, which do the lane/spawner setup that `CreateByDesignerName()+Spawn()` skips
+(that path AVs on `npc_trooper`):
+
+- `citadel_spawn_trooper` — "Creates a new trooper NPC and spawn them in front of the player"
+- `citadel_spawn_trooper_grid` — "NxN trooper grid in front of the player"
+- `citadel_spawn_trooper_zipline` — "Spawn a trooper on a zipline"
+- `trooper_kill_all`, `trooper_kill_non_bosses`, `citadel_destroy_all_npcs` — cleanup
+
+These are cheat-gated, so a player can't run them directly. Drive them from the plugin:
+`ConVar.Find("sv_cheats")?.SetInt(1)` then `Server.ClientCommand(caller.Slot, "citadel_spawn_trooper")`
+— runs in the player's context so "in front of the player" resolves. `br_run` does exactly this.
+
+**Wave-tuning cvars** (the game already spawns lane waves — crank these for Boss Rush difficulty
+instead of spawning each trooper ourselves):
+- `citadel_trooper_spawn_enabled` (master toggle), `citadel_trooper_squad_size` (4/wave)
+- `citadel_trooper_spawn_interval_early/late/very_late` (30/25/20s), `_initial` (16s), `_spawn_wave_spread`
+- `citadel_trooper_health_mult` (1.5), `citadel_trooper_health_mult_gametime` (35)
+- `citadel_trooper_max_per_lane` (0 = uncapped), `citadel_trooper_use_ziplines`, `citadel_trooper_shooting_enabled`
+
+**Note:** `npc_create` / `npc_create_aimed` exist but spawn idle denizen/neutral NPCs that don't
+fight back — wrong for wave enemies.
