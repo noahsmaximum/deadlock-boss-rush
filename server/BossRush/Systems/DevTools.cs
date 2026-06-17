@@ -93,12 +93,13 @@ public sealed partial class BossRushPlugin
     }
 
     [Command("br_gamestate", Description = "Print GameRules state (mode/state/clock/counts)")]
-    public void CmdGameState(CCitadelPlayerController caller)
+    public void CmdGameState(CCitadelPlayerController? caller = null)
     {
         var s =
             $"mode={GameRules.GameMode} state={GameRules.GameState} clock={GameRules.GameClock:F0}s " +
             $"midboss={GameRules.MidbossKillCount} amber={GameRules.AmberRejuvCount} sapphire={GameRules.SapphireRejuvCount}";
         Console.WriteLine($"[Boss Rush] {s}");
-        Chat.PrintToChat(caller, s);
+        if (caller != null)
+            Chat.PrintToChat(caller, s);
     }
 }
