@@ -25,9 +25,13 @@ public sealed class BossRushConfig
     /// <summary>Extra denizen strength added per minute of match time (linear scaling).</summary>
     public float DenizenStrengthPerMinute { get; set; } = 0.04f;
 
-    // ── Health regen (custom; sv_regeneration_force_on has no rate cvar) ──────────
-    /// <summary>HP/sec the heroes passively regen — hero-only, tunable (the cheat's rate can't be slowed). Dial to ~1/4 the cheat's feel.</summary>
-    public float RegenPerSecond { get; set; } = 6.0f;
+    // ── Health regen (custom heal loop; the HUD regen stat can't be set directly) ──
+    /// <summary>HP/sec the heroes regen at match start.</summary>
+    public float RegenStartPerSecond { get; set; } = 50.0f;
+    /// <summary>HP/sec the heroes regen once fully ramped.</summary>
+    public float RegenMaxPerSecond { get; set; } = 200.0f;
+    /// <summary>Minutes over which regen ramps linearly from start to max.</summary>
+    public float RegenRampMinutes { get; set; } = 30.0f;
     /// <summary>Regen pauses this many seconds after a hero takes damage.</summary>
     public float RegenWaitSeconds { get; set; } = 5.0f;
 
