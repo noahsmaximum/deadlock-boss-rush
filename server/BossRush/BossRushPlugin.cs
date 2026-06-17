@@ -30,6 +30,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     private PatronCombatSystem _patron = null!;
     private LootSystem _loot = null!;
     private UpgradeStation _upgrades = null!;
+    private IHandle? _teamEnforce;
 
     public override void OnLoad(bool isReload)
     {
@@ -49,6 +50,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     public override void OnUnload()
     {
         // Cancel timers so a hot-reload doesn't leak loops.
+        _teamEnforce?.Cancel();
         _rageWaves.Stop();
         _spawns.Stop();
         _patron.Stop();
@@ -59,10 +61,17 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     public override void OnStartupServer()
     {
         ApplyRuleset();
-        _spawns.Start(); // 2× enemy troopers, doubled Guardians, scaling denizens
+        _spawns.Start(); // scale the Hidden King's lane troopers up over time
         _patron.Start();  // Patron attack + buff loops
-        _rageWaves.Start(); // 10-min 4× waves
+        _rageWaves.Start(); // 10-min lane floods
+
+        // PvE co-op: keep every human on the Archmother team; the Hidden King is AI-only.
+        TeamControl.ForceAll();
+        _teamEnforce = Timer.Every(2.Seconds(), TeamControl.ForceAll);
     }
+
+    /// <summary>Pull every joiner onto the Archmother team immediately (the periodic sweep is the backstop).</summary>
+    public override void OnClientFullConnect(ClientFullConnectEvent args) => TeamControl.ForceAll();
 
     /// <summary>
     /// Server convars that shape the mode. Names are confirmed from the example plugins; tune

@@ -3,17 +3,17 @@ using DeadworksManaged.Api;
 namespace BossRush;
 
 /// <summary>
-/// DESIGN.md #12 — every <see cref="BossRushConfig.RageWaveIntervalMinutes"/> minutes, flood the
-/// map with hostile troopers, announce it (HUD + a custom sound shipped in the client addon), and
-/// hold the "rage" state for the surge.
-///
-/// Troopers are spawned via the game's console spawner (<see cref="Troopers"/>); that gives us no
-/// entity handles back, so the surge ends on a timer rather than true "until every wave entity is
-/// dead" tracking. (Upgrade later by counting enemy troopers if we want exact clears.)
+/// DESIGN.md #12 — every <see cref="BossRushConfig.RageWaveIntervalMinutes"/> minutes the Hidden
+/// King floods every lane: we temporarily crank the trooper wave cvars (bigger squads, much shorter
+/// interval) so the natural lane spawners pour troopers out for the surge, announce it (HUD + a
+/// custom sound from the client addon), then restore the normal cadence.
 /// </summary>
 public sealed class RageWaveSystem
 {
     private static readonly Duration SurgeDuration = 45.Seconds();
+
+    // Game defaults (citadel_trooper_*): squad 4, early/late interval 30/25s.
+    private const int BaseSquad = 4, BaseIntervalEarly = 30, BaseIntervalLate = 25;
 
     private readonly BossRushConfig _cfg;
     private readonly ITimer _timer;
@@ -37,6 +37,7 @@ public sealed class RageWaveSystem
     {
         _loop?.Cancel(); _loop = null;
         _surgeEnd?.Cancel(); _surgeEnd = null;
+        if (RageActive) SetTrooperWaves(BaseSquad, BaseIntervalEarly, BaseIntervalLate);
         RageActive = false;
     }
 
@@ -48,12 +49,12 @@ public sealed class RageWaveSystem
         if (RageActive) return; // don't stack; wait for the current surge to subside
         RageActive = true;
 
-        Announce("RAGE WAVE", "The map is overrun — survive the surge!");
+        Announce("RAGE WAVE", "The Hidden King floods every lane — survive the surge!");
         PlayRageSoundForEveryone();
 
-        // RageWaveTrooperMultiplier sized as an NxN grid (4× -> 4x4 = 16 troopers).
-        int grid = Math.Clamp((int)MathF.Round(_cfg.RageWaveTrooperMultiplier), 2, 6);
-        Troopers.SpawnGrid(grid);
+        // Flood the lanes: bigger, faster waves for the surge.
+        int rageSquad = Math.Clamp((int)MathF.Round(BaseSquad * _cfg.RageWaveTrooperMultiplier), 8, 24);
+        SetTrooperWaves(rageSquad, intervalEarly: 6, intervalLate: 6);
 
         _surgeEnd?.Cancel();
         _surgeEnd = _timer.Once(SurgeDuration, EndWave);
@@ -64,12 +65,19 @@ public sealed class RageWaveSystem
         if (!RageActive) return;
         RageActive = false;
         _surgeEnd?.Cancel(); _surgeEnd = null;
+        SetTrooperWaves(BaseSquad, BaseIntervalEarly, BaseIntervalLate);
         Announce("Wave cleared", "The surge subsides… for now.");
+    }
+
+    private static void SetTrooperWaves(int squad, int intervalEarly, int intervalLate)
+    {
+        ConVar.Find("citadel_trooper_squad_size")?.SetInt(squad);
+        ConVar.Find("citadel_trooper_spawn_interval_early")?.SetFloat(intervalEarly);
+        ConVar.Find("citadel_trooper_spawn_interval_late")?.SetFloat(intervalLate);
     }
 
     private void PlayRageSoundForEveryone()
     {
-        // Emit the client-addon soundevent from each hero pawn so every player hears it.
         foreach (var pawn in Players.GetAllPawns())
             pawn.EmitSound(_cfg.RageWaveStartSound);
     }

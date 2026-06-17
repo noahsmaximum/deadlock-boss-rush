@@ -3,18 +3,15 @@ using DeadworksManaged.Api;
 namespace BossRush;
 
 /// <summary>
-/// DESIGN.md #1, #9, #10 — keeps heroes' troopers vanilla while giving the enemy side
-/// <see cref="BossRushConfig.EnemyTrooperSpawnMultiplier"/>× spawns, doubles the lane Guardians,
-/// and makes denizens (neutrals) start stronger and scale with match time.
-///
-/// We inject extra enemy waves at runtime so only one side is buffed (no symmetric VData edit,
-/// no client install). Verified classnames: <c>npc_trooper</c>, <c>npc_boss_tier1</c> (Guardian).
+/// DESIGN.md #9, #10 — the enemy threat is the Hidden King's own lane troopers. Rather than
+/// spawning our own (raw <c>npc_trooper</c> spawns AV; near-player console spawns feel wrong), we
+/// let the game march them out of the Hidden King's lanes and make them progressively deadlier:
+/// every enemy-team trooper is buffed as it spawns, scaling with match time.
 /// </summary>
 public sealed class SpawnDirector
 {
     private readonly BossRushConfig _cfg;
     private readonly ITimer _timer;
-    private IHandle? _waveLoop;
 
     public SpawnDirector(BossRushConfig cfg, ITimer timer)
     {
@@ -22,59 +19,29 @@ public sealed class SpawnDirector
         _timer = timer;
     }
 
-    public void Start()
-    {
-        Stop();
-        // Bonus enemy waves between the natural ones. (Natural trooper spawns stay on via convar.)
-        _waveLoop = _timer.Every(BonusWaveInterval(), SpawnBonusEnemyWave);
-        // Double the Guardians once the map's objectives exist.
-        _timer.Once(5.Seconds(), DoubleGuardians);
-    }
+    public void Start() { }
+    public void Stop() { }
 
-    public void Stop()
-    {
-        _waveLoop?.Cancel();
-        _waveLoop = null;
-    }
-
-    private Duration BonusWaveInterval()
-    {
-        // Vanilla troopers spawn ~every 30s; the bonus cadence scales with the multiplier.
-        // Placeholder until real cadence is measured in P1.
-        var bonusPerMinute = MathF.Max(0f, _cfg.EnemyTrooperSpawnMultiplier - 1f) * 2f;
-        var seconds = bonusPerMinute > 0 ? 60f / bonusPerMinute : 9999f;
-        return ((int)seconds).Seconds();
-    }
-
-    private void SpawnBonusEnemyWave()
-    {
-        // Extra hostile troopers on top of the natural lane waves, via the game's own spawner —
-        // raw CreateByDesignerName("npc_trooper")+Spawn() AVs the server (docs/VERIFIED_API.md §11–12).
-        int grid = Math.Clamp((int)MathF.Round(_cfg.EnemyTrooperSpawnMultiplier), 2, 5);
-        Troopers.SpawnGrid(grid);
-    }
-
-    private void DoubleGuardians()
-    {
-        if (_cfg.GuardiansPerLaneMultiplier <= 1) return;
-        // TODO(P1): for each existing npc_boss_tier1 (Guardian), spawn (mult−1) more nearby,
-        //   matching TeamNum/lane. Alternatively place duplicates in an edited map (client install).
-        //   foreach (var g in Entities.ByDesignerName("npc_boss_tier1")) { ...clone near g... }
-    }
-
-    /// <summary>Buff denizens to start stronger and scale with match time (DESIGN.md #10).</summary>
+    /// <summary>Buff the Hidden King's lane troopers as they spawn, scaling with match time.</summary>
     public void OnEntitySpawned(EntitySpawnedEvent e)
     {
-        var name = e.Entity.DesignerName;
-        // Denizens = neutral camps. TODO(P1): confirm their designer name(s); npc_trooper is lane,
-        // not neutral. Apply a scaling modifier sized by GameRules.GameClock.
-        if (name is not ("npc_neutral" or "npc_denizen")) return;
+        var ent = e.Entity;
+        if (ent.TeamNum != BossRushPlugin.EnemyTeam) return;
+        if (!ent.DesignerName.Contains("trooper", StringComparison.OrdinalIgnoreCase)) return;
 
-        float minutes = GameRules.GameClock / 60f;
-        float strength = _cfg.DenizenBaseStrengthMultiplier + _cfg.DenizenStrengthPerMinute * minutes;
+        // Defer one tick so the trooper's health is initialized before we scale it.
+        uint handle = ent.EntityHandle;
+        _timer.NextTick(() =>
+        {
+            var t = CBaseEntity.FromHandle(handle);
+            if (t == null || !t.IsAlive || t.MaxHealth <= 0) return;
 
-        using var kv = new KeyValues3();
-        kv.SetFloat("strength", strength);
-        e.Entity.AddModifier("modifier_bossrush_denizen_scaling", kv); // TODO(P1): author this modifier
+            float minutes = GameRules.GameClock / 60f;
+            float mult = _cfg.DenizenBaseStrengthMultiplier + _cfg.DenizenStrengthPerMinute * minutes;
+            if (mult <= 1f) return;
+
+            t.MaxHealth = (int)(t.MaxHealth * mult);
+            t.Health = t.MaxHealth;
+        });
     }
 }
