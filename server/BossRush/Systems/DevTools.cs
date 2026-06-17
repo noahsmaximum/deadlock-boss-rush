@@ -102,4 +102,36 @@ public sealed partial class BossRushPlugin
         if (caller != null)
             Chat.PrintToChat(caller, s);
     }
+
+    [Command("br_spawn", Description = "Spawn one entity by designer name in front of you (dev)")]
+    public void CmdSpawn(CCitadelPlayerController caller, string designerName, string team = "3")
+    {
+        var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
+        if (pawn == null) return;
+        if (!int.TryParse(team, out var teamNum)) teamNum = BossRushPlugin.EnemyTeam;
+
+        // Place it ~200u in front of where you're facing, lifted off the ground a touch.
+        var yaw = pawn.CameraAngles.Y * (MathF.PI / 180f);
+        var origin = pawn.Position
+            + new Vector3(MathF.Cos(yaw), MathF.Sin(yaw), 0f) * 200f
+            + new Vector3(0f, 0f, 16f);
+
+        var ent = CBaseEntity.CreateByDesignerName(designerName);
+        if (ent == null)
+        {
+            var miss = $"[Boss Rush] CreateByDesignerName('{designerName}') returned null";
+            Console.WriteLine(miss);
+            Chat.PrintToChat(caller, miss);
+            return;
+        }
+
+        ent.TeamNum = teamNum;
+        ent.Teleport(position: origin);
+        ent.Spawn();
+
+        var msg = $"[Boss Rush] spawned '{designerName}' -> class {ent.Classname}, team {teamNum}, " +
+                  $"valid={ent.IsValid}, hp={ent.Health}/{ent.MaxHealth} at {origin.X:F0},{origin.Y:F0},{origin.Z:F0}";
+        Console.WriteLine(msg);
+        Chat.PrintToChat(caller, msg);
+    }
 }
