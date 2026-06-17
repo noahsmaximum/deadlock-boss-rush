@@ -13,6 +13,7 @@ public sealed class RegenSystem
     private readonly BossRushConfig _cfg;
     private readonly ITimer _timer;
     private IHandle? _loop;
+    private int _ticks;
     private readonly EntityData<float> _lastDamage = new();
 
     public RegenSystem(BossRushConfig cfg, ITimer timer)
@@ -42,11 +43,21 @@ public sealed class RegenSystem
         if (_cfg.RegenPerSecond <= 0f) return;
 
         float now = GameRules.GameClock;
-        foreach (var pawn in Players.GetAllPawns())
+        int healed = 0;
+        // Same path that dw_br_heal proved works: controllers -> hero pawn.
+        foreach (var controller in Players.GetAll())
         {
-            if (!pawn.IsAlive) continue;
+            var pawn = controller.GetHeroPawn();
+            if (pawn == null || !pawn.IsAlive) continue;
+            if (pawn.Health >= pawn.MaxHealth) continue;
             if (_lastDamage.TryGet(pawn, out var last) && now - last < _cfg.RegenWaitSeconds) continue;
+
             pawn.Heal(_cfg.RegenPerSecond);
+            healed++;
         }
+
+        // Throttled diagnostic (every ~5s) — confirms the loop runs and who it heals. Remove later.
+        if (++_ticks % 5 == 0)
+            Console.WriteLine($"[Boss Rush] regen: healed {healed} hero(es) +{_cfg.RegenPerSecond}/s (clock {now:F0})");
     }
 }
