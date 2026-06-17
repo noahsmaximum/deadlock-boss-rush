@@ -48,13 +48,10 @@ public sealed class SpawnDirector
 
     private void SpawnBonusEnemyWave()
     {
-        // TODO(P0/P1): per enemy lane spawn point (recorded in-game via an addspawn command):
-        //   var t = CBaseEntity.CreateByName("npc_trooper");   // or CreateByDesignerName
-        //   if (t == null) return;
-        //   t.Teleport(position: point);
-        //   t.TeamNum = BossRushPlugin.EnemyTeam;
-        //   t.Spawn();
-        // P0 experiment #2: confirm a runtime-spawned npc_trooper paths its lane & respects TeamNum.
+        // Extra hostile troopers on top of the natural lane waves, via the game's own spawner —
+        // raw CreateByDesignerName("npc_trooper")+Spawn() AVs the server (docs/VERIFIED_API.md §11–12).
+        int grid = Math.Clamp((int)MathF.Round(_cfg.EnemyTrooperSpawnMultiplier), 2, 5);
+        Troopers.SpawnGrid(grid);
     }
 
     private void DoubleGuardians()

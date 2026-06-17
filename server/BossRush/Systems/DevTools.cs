@@ -201,4 +201,13 @@ public sealed partial class BossRushPlugin
         Console.WriteLine(msg);
         if (caller != null) Chat.PrintToChat(caller, msg);
     }
+
+    [Command("br_ragewave", Description = "Trigger a rage wave now (dev)")]
+    public void CmdRageWave(CCitadelPlayerController? caller = null)
+    {
+        _rageWaves.TriggerNow();
+        var msg = "[Boss Rush] rage wave triggered (dev)";
+        Console.WriteLine(msg);
+        if (caller != null) Chat.PrintToChat(caller, msg);
+    }
 }

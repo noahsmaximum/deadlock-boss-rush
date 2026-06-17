@@ -43,7 +43,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
             : "[Boss Rush] loaded. Loot the lanes. Kill the Patron.");
-        Console.WriteLine("[Boss Rush] dev commands: br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run");
+        Console.WriteLine("[Boss Rush] dev commands: br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave");
     }
 
     public override void OnUnload()
@@ -70,6 +70,8 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     /// </summary>
     private void ApplyRuleset()
     {
+        // citadel_spawn_trooper(_grid), used by the wave systems, is cheat-gated.
+        ConVar.Find("sv_cheats")?.SetInt(1);
         // Heroes' own troopers spawn normally; SpawnDirector adds the enemy 2× on top.
         ConVar.Find("citadel_trooper_spawn_enabled")?.SetInt(1);
         ConVar.Find("citadel_npc_spawn_enabled")?.SetInt(1);
