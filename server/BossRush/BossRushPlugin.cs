@@ -33,6 +33,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     private PatronCombatSystem _patron = null!;
     private LootSystem _loot = null!;
     private UpgradeStation _upgrades = null!;
+    private RegenSystem _regen = null!;
 
     public override void OnLoad(bool isReload)
     {
@@ -42,6 +43,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         _patron = new PatronCombatSystem(Config, Timer);
         _loot = new LootSystem(Config, _enhancements);
         _upgrades = new UpgradeStation(Config, _enhancements);
+        _regen = new RegenSystem(Config, Timer);
 
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
@@ -55,6 +57,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         _rageWaves.Stop();
         _spawns.Stop();
         _patron.Stop();
+        _regen.Stop();
         _enhancements.Clear();
     }
 
@@ -65,6 +68,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         _spawns.Start(); // scale the Hidden King's lane troopers up over time
         _patron.Start();  // Patron attack + buff loops
         _rageWaves.Start(); // periodic lane floods
+        _regen.Start(); // slow hero-only health regen
 
         // NOTE: automatic team-forcing is disabled — repeatedly calling ChangeTeam during hero
         // select broke spawning (stuck portrait, no hero load). Use dw_br_forceteam to move
@@ -85,27 +89,19 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         // Buying happens at Upgrade Stations, not anywhere — but allow for now while prototyping.
         ConVar.Find("citadel_allow_purchasing_anywhere")?.SetInt(1);
         ConVar.Find("citadel_allow_duplicate_heroes")?.SetInt(1);
-
-        // Forced health regen for sustain, at a quarter of the default rate.
-        ConVar.Find("sv_regeneration_force_on")?.SetInt(1);
-        SetRegenRateFraction(Config.RegenRateFraction);
+        // Hero health regen is handled by RegenSystem (custom rate) — sv_regeneration_force_on has
+        // no rate cvar in Deadlock, so it can't be slowed.
 
         // TODO(P0): enable StreetBrawl ruleset (uncapped items). Mechanism TBD on a live server
         // (launch arg / map / convar / writing GameRules m_eGameMode) — see VERIFIED_API.md §9.
     }
 
-    private static float? _baseRegenRate;
-
-    /// <summary>
-    /// Set <c>sv_regeneration_rate</c> to <paramref name="fraction"/> of its default. The default is
-    /// captured once (before we change it) so re-applying on each map load doesn't compound.
-    /// </summary>
-    private static void SetRegenRateFraction(float fraction)
+    /// <summary>Pause a hero's regen when they take damage.</summary>
+    public override HookResult OnTakeDamage(TakeDamageEvent args)
     {
-        var rate = ConVar.Find("sv_regeneration_rate");
-        if (rate == null) return;
-        _baseRegenRate ??= rate.GetFloat();
-        rate.SetFloat(_baseRegenRate.Value * fraction);
+        if (args.Entity.As<CCitadelPlayerPawn>() is { } pawn)
+            _regen.OnHeroDamaged(pawn);
+        return HookResult.Continue;
     }
 
     public override void OnPrecacheResources()
