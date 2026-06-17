@@ -156,4 +156,29 @@ public sealed partial class BossRushPlugin
         Console.WriteLine(msg);
         Chat.PrintToChat(caller, msg);
     }
+
+    [Command("br_cmds", Description = "List convars/concommands matching a filter, to console (dev)")]
+    public void CmdListCommands(string filter = "")
+    {
+        if (string.IsNullOrWhiteSpace(filter))
+        {
+            Console.WriteLine("[Boss Rush] usage: br_cmds <substring>  (e.g. trooper, spawn, lane, barrack)");
+            return;
+        }
+
+        bool Match(string? s) => s != null && s.Contains(filter, StringComparison.OrdinalIgnoreCase);
+
+        var cmds = Server.EnumerateConCommands()
+            .Where(c => Match(c.Name) || Match(c.Description))
+            .OrderBy(c => c.Name).ToList();
+        var cvars = Server.EnumerateConVars()
+            .Where(c => Match(c.Name) || Match(c.Description))
+            .OrderBy(c => c.Name).ToList();
+
+        Console.WriteLine($"[Boss Rush] '{filter}': {cmds.Count} concommands, {cvars.Count} convars");
+        foreach (var c in cmds.Take(80))
+            Console.WriteLine($"  [cmd] {c.Name}  -  {c.Description}");
+        foreach (var c in cvars.Take(80))
+            Console.WriteLine($"  [var] {c.Name} = {c.Value}  -  {c.Description}");
+    }
 }
