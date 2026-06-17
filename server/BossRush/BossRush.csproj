@@ -1,16 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Boss Rush = a Deadworks plugin (a .NET 10 class library DLL). This csproj mirrors the
-    shipped example plugins exactly (see TagPlugin.csproj). Build model (docs/SETUP.md §A):
+    Boss Rush = a Deadworks plugin (.NET 10 class library). It needs Deadworks' managed SDK
+    (DeadworksManaged.Api) to compile. Two supported build layouts:
 
-      Junction this folder into your Deadworks clone:
-        mklink /J <deadworks>\examples\plugins\BossRush <thisRepo>\server\BossRush
+    A) In-tree / junction build (mirrors the shipped example plugins):
+         mklink /J <deadworks>\examples\plugins\BossRush <thisRepo>\server\BossRush
+       Build from the junction. The relative ProjectReference resolves to <deadworks>\managed,
+       and DeadlockManagedDir (from <deadworks>\examples\Directory.Build.props -> local.props)
+       auto-deploys BossRush.dll to <Deadlock>\...\managed\plugins.
 
-    Then the relative SDK ProjectReference and the auto-deploy below resolve just like the
-    examples: DeadlockManagedDir is provided by <deadworks>\examples\Directory.Build.props,
-    which reads DeadlockDir from your local.props. On Build, BossRush.dll is copied to
-    <DeadlockDir>\managed\plugins\ and hot-reloaded by a running server.
+    B) Standalone build (this repo anywhere, no Deadworks source tree):
+       Point DeadworksManagedDir at your deployed SDK folder; it references the compiled
+       DeadworksManaged.Api.dll instead, then deploys there too. Pass it on the CLI:
+         dotnet build server\BossRush\BossRush.csproj -c Release ^
+           -p:DeadworksManagedDir="F:\...\Deadlock\game\bin\win64\managed"
+       or set the DEADWORKS_MANAGED_DIR environment variable once.
   -->
 
   <PropertyGroup>
@@ -21,20 +26,55 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>BossRush</AssemblyName>
     <RootNamespace>BossRush</RootNamespace>
+
+    <!-- (A) In-tree SDK project, if the Deadworks source tree is present next to us. -->
+    <DeadworksApiProject>$(MSBuildThisFileDirectory)..\..\..\managed\DeadworksManaged.Api\DeadworksManaged.Api.csproj</DeadworksApiProject>
+    <UseApiProject>false</UseApiProject>
+    <UseApiProject Condition="Exists('$(DeadworksApiProject)')">true</UseApiProject>
+
+    <!-- (B) Deployed managed dir holding DeadworksManaged.Api.dll; falls back to env var. -->
+    <DeadworksManagedDir Condition="'$(DeadworksManagedDir)' == ''">$(DEADWORKS_MANAGED_DIR)</DeadworksManagedDir>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\managed\DeadworksManaged.Api\DeadworksManaged.Api.csproj">
+  <!-- (A) In-tree / junction build: reference the SDK project. -->
+  <ItemGroup Condition="'$(UseApiProject)' == 'true'">
+    <ProjectReference Include="$(DeadworksApiProject)">
       <Private>false</Private>
       <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
   </ItemGroup>
 
-  <Target Name="DeployToGame" AfterTargets="Build" Condition="'$(DeadlockManagedDir)' != ''">
+  <!-- (B) Standalone build: reference the compiled SDK DLL + its protobuf dependency
+       (compile-time only; the host already ships both, so don't copy them). -->
+  <ItemGroup Condition="'$(UseApiProject)' != 'true'">
+    <Reference Include="DeadworksManaged.Api">
+      <HintPath>$(DeadworksManagedDir)\DeadworksManaged.Api.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <PackageReference Include="Google.Protobuf" Version="3.29.3">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- Helpful error instead of 50+ "type not found" errors when neither layout is configured. -->
+  <Target Name="CheckDeadworksSdk" BeforeTargets="ResolveAssemblyReferences"
+          Condition="'$(UseApiProject)' != 'true' And '$(DeadworksManagedDir)' == ''">
+    <Error Text="Deadworks SDK not found. Either build from the junction inside the Deadworks tree (layout A in this file's header), or set DeadworksManagedDir / DEADWORKS_MANAGED_DIR to your '&lt;Deadlock&gt;\game\bin\win64\managed' folder (layout B)." />
+  </Target>
+
+  <!-- Auto-deploy BossRush.dll to <managed>\plugins. Uses DeadlockManagedDir (layout A, from
+       Directory.Build.props) or DeadworksManagedDir (layout B). -->
+  <Target Name="DeployToGame" AfterTargets="Build"
+          Condition="'$(DeadlockManagedDir)' != '' Or '$(DeadworksManagedDir)' != ''">
+    <PropertyGroup>
+      <_DeployDir Condition="'$(DeadlockManagedDir)' != ''">$(DeadlockManagedDir)</_DeployDir>
+      <_DeployDir Condition="'$(_DeployDir)' == ''">$(DeadworksManagedDir)</_DeployDir>
+    </PropertyGroup>
     <ItemGroup>
       <DeployFiles Include="$(OutputPath)BossRush.dll;$(OutputPath)BossRush.pdb" />
     </ItemGroup>
-    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(DeadlockManagedDir)\plugins"
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(_DeployDir)\plugins"
           SkipUnchangedFiles="false" Retries="0" ContinueOnError="WarnAndContinue" />
   </Target>
 
