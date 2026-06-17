@@ -25,11 +25,9 @@ public sealed class BossRushConfig
     /// <summary>Extra denizen strength added per minute of match time (linear scaling).</summary>
     public float DenizenStrengthPerMinute { get; set; } = 0.04f;
 
-    // ── Health drops (Hidden King creep kills) ────────────────────────────────────
-    /// <summary>Designer name of the pickup a Hidden King creep drops on death. Empty = disabled until confirmed in-game.</summary>
-    public string HealthDropEntity { get; set; } = "";
-    /// <summary>Chance (0–1) a creep drops a health pickup — 0.125 ≈ 1/8 the rate of the medics that drop health.</summary>
-    public float HealthDropChance { get; set; } = 0.125f;
+    // ── Health regen (sv_regeneration_force_on) ───────────────────────────────────
+    /// <summary>Fraction of the default sv_regeneration_rate to apply (0.25 = a quarter).</summary>
+    public float RegenRateFraction { get; set; } = 0.25f;
 
     // ── Rage waves (DESIGN.md #12) ────────────────────────────────────────────────
     /// <summary>Minutes between automatic rage waves.</summary>
