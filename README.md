@@ -1,4 +1,4 @@
-# Deadlock Boss Rush
+# Deadlock BOSS RUSH
 
 A co-op **PvE** mode for Valve's *Deadlock*. Your team spawns on one side of the map and
 fights through three lanes — defended by **double the Guardians** and a **Patron that fights
