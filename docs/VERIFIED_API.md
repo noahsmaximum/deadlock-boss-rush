@@ -175,6 +175,15 @@ The pitch's "no item limit" is a **real, supported** capability, not a wall:
    registers, and pick a real beam `.vpcf` path for the laser.
 5. **Crystal/rejuv pickups:** find the rejuvenator/crystal entity classname and whether it spawns
    at arbitrary coords (relates to `AmberRejuvCount`/`SapphireRejuvCount`).
+6. **Hero-ult casting on the boss (the Hidden King — DESIGN.md §4):** can a non-hero pawn
+   (`npc_boss_tier3`) fire a hero ultimate? Try `AddAbility("ability_…", slot)` + `ExecuteAbilityByID`,
+   vs spawning the ability child-ent and triggering it, vs `AcceptInput`. Record which ults resolve
+   and their real ability ids. Also confirm reading `m_ePhase`/`m_eAliveState` transitions from
+   managed code (hook vs. poll) and whether phases can be *added* beyond the native count.
+7. **Legendary-only shop at a steep price (mechanic #14):** confirm how to (a) restrict purchasing
+   to legendary-tier items and (b) inflate their cost — intercepting `OnModifyCurrency`
+   (source `EItemPurchase`) to reject/scale, vs item-cost cvars. Note the interaction with
+   `citadel_allow_purchasing_anywhere`.
 
 ---
 
@@ -226,7 +235,8 @@ Tested with `dw_br_spawn` against a connected hero. Spawn path:
 - Set health on spawned enemies (neutrals are 1 hp).
 - `EGameState` values observed: 2=WaitingForPlayersToJoin, 3=HeroSelection, 4=MatchIntro,
   5=WaitForMapToLoad, 6=PreGameWait, 7=GameInProgress. `CNPC_Boss_Tier3` has `m_ePhase`
-  (ETier3Phase_t) + `m_eAliveState` (ETier3State_t).
+  (ETier3Phase_t) + `m_eAliveState` (ETier3State_t) — the engine hook for the multi-phase
+  Hidden King (DESIGN.md §4).
 - **Still open:** spawning real lane troopers safely (needs the game's trooper spawner, not
   `CreateByDesignerName`); the `npc_barrack_boss`/boss tier1/tier2 ladder; tuning health/teams.
 
