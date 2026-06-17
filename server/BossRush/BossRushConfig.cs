@@ -27,7 +27,7 @@ public sealed class BossRushConfig
 
     // ── Health regen (sv_regeneration_force_on) ───────────────────────────────────
     /// <summary>Fraction of the default sv_regeneration_rate to apply (0.25 = a quarter).</summary>
-    public float RegenRateFraction { get; set; } = 0.25f;
+    public float RegenRateFraction { get; set; } = 1.5f;
 
     // ── Rage waves (DESIGN.md #12) ────────────────────────────────────────────────
     /// <summary>Minutes between automatic rage waves.</summary>
