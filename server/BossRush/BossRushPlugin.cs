@@ -33,6 +33,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     private PatronCombatSystem _patron = null!;
     private LootSystem _loot = null!;
     private UpgradeStation _upgrades = null!;
+    private HealthDropSystem _healthDrops = null!;
 
     public override void OnLoad(bool isReload)
     {
@@ -42,6 +43,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         _patron = new PatronCombatSystem(Config, Timer);
         _loot = new LootSystem(Config, _enhancements);
         _upgrades = new UpgradeStation(Config, _enhancements);
+        _healthDrops = new HealthDropSystem(Config);
 
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
@@ -104,6 +106,19 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         // convert to the Citadel pawn the way the example plugins do.
         if (args.UseridPawn?.As<CCitadelPlayerPawn>() is { } victim)
             _enhancements.OnPlayerDeath(victim);
+        return HookResult.Continue;
+    }
+
+    /// <summary>Hidden King creeps drop a health pickup when they die (~1/8 a medic's rate).</summary>
+    [GameEventHandler("entity_killed")]
+    public HookResult OnEntityKilled(GameEvent e)
+    {
+        var victim = CBaseEntity.FromIndex(e.GetInt("entindex_killed"));
+        if (victim != null && victim.TeamNum == EnemyTeam &&
+            victim.DesignerName.Contains("trooper", StringComparison.OrdinalIgnoreCase))
+        {
+            _healthDrops.OnEnemyTrooperKilled(victim.Position);
+        }
         return HookResult.Continue;
     }
 
