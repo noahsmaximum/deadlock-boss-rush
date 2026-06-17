@@ -175,3 +175,32 @@ The pitch's "no item limit" is a **real, supported** capability, not a wall:
    registers, and pick a real beam `.vpcf` path for the laser.
 5. **Crystal/rejuv pickups:** find the rejuvenator/crystal entity classname and whether it spawns
    at arbitrary coords (relates to `AmberRejuvCount`/`SapphireRejuvCount`).
+
+---
+
+## 10. Live entity census — `dl_midtown`, idle server (2026-06-16)
+
+Captured with `dw_br_dumpents` on a dedicated server at `state=Init` (no players, no match):
+**3431 entities, 99 distinct designer names.** Top names mapped to Boss Rush systems:
+
+| Designer name | Count | Use for Boss Rush |
+|---|---|---|
+| `citadel_breakable_prop` | 691 | breakable loot urns/crates already in the map → LootSystem hook target |
+| `info_neutral_trooper_spawn` | 228 | neutral/jungle camp spawn points |
+| `info_neutral_trooper_camp` | 51 | neutral camp anchors |
+| `npc_neutral_bug` | 69 | live neutral creeps (already spawned at idle) |
+| `info_trooper_spawn` | 24 | **lane trooper spawn points** |
+| `info_super_trooper_spawn` | 12 | super-trooper spawn points |
+| `npc_barrack_boss` | 12 | **Guardian / lane-boss NPC** (candidate mini-boss) |
+| `info_team_spawn` | 89 | team spawn points |
+| `trigger_item_shop` | 9 | in-map shops → Upgrade Station siting |
+| `lane_marker_path` | 12 | lane geometry/path nodes |
+
+**Key facts (idle):**
+- `GameRules`: `mode=Invalid`, `state=Init` — the bare `+map dl_midtown` launch does **not** set a
+  real game mode; no Street Brawl ruleset is active until a match is configured / players join.
+- **Dynamic NPCs are absent at idle:** no `npc_trooper`, no `npc_boss_tier3` (Patron). Lane
+  troopers and the mid-boss only spawn once a match is in progress — capture those with a second
+  `dw_br_dumpents` *after* a client connects and the match starts.
+- Full per-entity positions (spawn points, shops, lanes) live in the JSON dump
+  (`~\deadlock_dumps\entdump_*.json`) for baking into config.
