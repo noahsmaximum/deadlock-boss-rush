@@ -1,9 +1,10 @@
 # Deadlock BOSS RUSH
 
 A co-op **PvE** mode for Valve's *Deadlock*. Your team spawns on one side of the map and
-fights through three lanes — defended by **double the Guardians** and a **Patron that fights
-back** with scaling laser attacks — looting power from the world (golden buddhas, boxes,
-crystals) instead of buying from a shop, building toward one goal: **kill the Patron.**
+fights through three lanes — defended by **double the Guardians** and a multi-phase **Hidden
+King** (the Patron) that fights back with scaling lasers and **hero ultimates** — looting power
+from the world (golden buddhas, boxes, crystals) instead of the shop. Only **legendary items**
+stay buyable, at a steep markup. One goal: **topple the Hidden King.**
 
 Signature beats: an **Upgrade Station** that enhances the items you already hold (at 2× cost),
 **2× enemy trooper spawns**, **scaling denizens**, extra **crystal-buff** spawns, and a
@@ -30,6 +31,6 @@ Two coordinated mods (Deadlock has no official custom-games SDK):
 
 > ⚠️ Built on **unofficial, early-development** community tooling. Deadworks' APIs change
 > without notice; CSDK/`gameinfo.gi` break on Deadlock patches. The `server/` scaffold is
-> written against **source-verified signatures** but isn't built/run yet — a handful of things
-> still need a live server (see VERIFIED_API.md §9). Custom servers run outside Valve
-> matchmaking; no official modding policy exists.
+> written against **source-verified signatures** and now **runs live** on a dedicated server (core
+> systems confirmed 2026-06-16; a few things still need live tuning — see VERIFIED_API.md §9).
+> Custom servers run outside Valve matchmaking; no official modding policy exists.
