@@ -182,17 +182,23 @@ public sealed partial class BossRushPlugin
             Console.WriteLine($"  [var] {c.Name} = {c.Value}  -  {c.Description}");
     }
 
-    [Command("br_run", Description = "Run a console command in your player context w/ sv_cheats (dev). Quote multi-word commands.")]
-    public void CmdRun(CCitadelPlayerController caller, string command)
+    [Command("br_run", Description = "Run a server console command w/ sv_cheats (dev). e.g. br_run citadel_spawn_trooper_grid 3")]
+    public void CmdRun(CCitadelPlayerController? caller = null, string command = "", string a1 = "", string a2 = "", string a3 = "")
     {
-        // Cheat-gated server commands (citadel_spawn_trooper, npc_create, ...) won't run when a
-        // player types them, but the server can issue them on the player's behalf. Force sv_cheats
-        // server-side, then run in the caller's context so "in front of the player" resolves.
-        ConVar.Find("sv_cheats")?.SetInt(1);
-        Server.ClientCommand(caller.Slot, command);
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            Console.WriteLine("[Boss Rush] usage: br_run <command> [arg] [arg] [arg]");
+            return;
+        }
 
-        var msg = $"[Boss Rush] ran as slot {caller.Slot}: {command}";
+        // Cheat-gated commands (citadel_spawn_trooper, ...) are rejected when the *client* runs
+        // them, but the server console can. Force sv_cheats server-side and run via ExecuteCommand.
+        ConVar.Find("sv_cheats")?.SetInt(1);
+        var full = string.Join(" ", new[] { command, a1, a2, a3 }.Where(s => !string.IsNullOrEmpty(s)));
+        Server.ExecuteCommand(full);
+
+        var msg = $"[Boss Rush] server-ran: {full}";
         Console.WriteLine(msg);
-        Chat.PrintToChat(caller, msg);
+        if (caller != null) Chat.PrintToChat(caller, msg);
     }
 }
