@@ -22,7 +22,7 @@ public sealed class BossRushConfig
     /// <summary>How long a surge lasts before the normal cadence restores.</summary>
     public float RageWaveSurgeDurationSeconds { get; set; } = 60.0f;
     /// <summary>Trooper spawn interval (seconds) during a surge — lower = faster waves.</summary>
-    public float RageWaveSpawnIntervalSeconds { get; set; } = 5.0f;
+    public float RageWaveSpawnIntervalSeconds { get; set; } = 20.0f;
     /// <summary>Troopers per squad at match start.</summary>
     public int RageWaveSquadBase { get; set; } = 10;
     /// <summary>Squad grows by this much at the first step, and again every step interval after.</summary>
