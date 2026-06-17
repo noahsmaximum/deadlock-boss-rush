@@ -210,4 +210,19 @@ public sealed partial class BossRushPlugin
         Console.WriteLine(msg);
         if (caller != null) Chat.PrintToChat(caller, msg);
     }
+
+    [Command("br_forceteam", Description = "Move all players to a team (default Archmother/HeroTeam) (dev)")]
+    public void CmdForceTeam(CCitadelPlayerController? caller = null, string team = "")
+    {
+        int t = int.TryParse(team, out var n) ? n : BossRushPlugin.HeroTeam;
+        int moved = 0;
+        foreach (var c in Players.GetAll())
+        {
+            c.ChangeTeam(t);
+            moved++;
+        }
+        var msg = $"[Boss Rush] moved {moved} player(s) to team {t}";
+        Console.WriteLine(msg);
+        if (caller != null) Chat.PrintToChat(caller, msg);
+    }
 }

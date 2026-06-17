@@ -16,9 +16,12 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
 {
     public override string Name => "Boss Rush";
 
-    /// <summary>Human heroes share one team in PvE; map NPCs/defenses are the other.</summary>
-    public const int HeroTeam = 2;
-    public const int EnemyTeam = 3;
+    /// <summary>
+    /// Human heroes share one team in PvE (the Archmother's); the Hidden King's team is AI-only.
+    /// Numbers per in-game observation: team 3 = Archmother (heroes), team 2 = Hidden King (enemies).
+    /// </summary>
+    public const int HeroTeam = 3;
+    public const int EnemyTeam = 2;
 
     [PluginConfig]
     public BossRushConfig Config { get; set; } = new();
@@ -30,7 +33,6 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     private PatronCombatSystem _patron = null!;
     private LootSystem _loot = null!;
     private UpgradeStation _upgrades = null!;
-    private IHandle? _teamEnforce;
 
     public override void OnLoad(bool isReload)
     {
@@ -44,13 +46,12 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
             : "[Boss Rush] loaded. Loot the lanes. Kill the Patron.");
-        Console.WriteLine("[Boss Rush] dev commands: br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave");
+        Console.WriteLine("[Boss Rush] dev commands: br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave, br_forceteam");
     }
 
     public override void OnUnload()
     {
         // Cancel timers so a hot-reload doesn't leak loops.
-        _teamEnforce?.Cancel();
         _rageWaves.Stop();
         _spawns.Stop();
         _patron.Stop();
@@ -63,15 +64,12 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         ApplyRuleset();
         _spawns.Start(); // scale the Hidden King's lane troopers up over time
         _patron.Start();  // Patron attack + buff loops
-        _rageWaves.Start(); // 10-min lane floods
+        _rageWaves.Start(); // periodic lane floods
 
-        // PvE co-op: keep every human on the Archmother team; the Hidden King is AI-only.
-        TeamControl.ForceAll();
-        _teamEnforce = Timer.Every(2.Seconds(), TeamControl.ForceAll);
+        // NOTE: automatic team-forcing is disabled — repeatedly calling ChangeTeam during hero
+        // select broke spawning (stuck portrait, no hero load). Use dw_br_forceteam to move
+        // players manually until a non-disruptive assignment mechanism is found.
     }
-
-    /// <summary>Pull every joiner onto the Archmother team immediately (the periodic sweep is the backstop).</summary>
-    public override void OnClientFullConnect(ClientFullConnectEvent args) => TeamControl.ForceAll();
 
     /// <summary>
     /// Server convars that shape the mode. Names are confirmed from the example plugins; tune
