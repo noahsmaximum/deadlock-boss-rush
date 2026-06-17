@@ -53,15 +53,32 @@ public sealed class BossRushConfig
     /// <summary>Soundevent fired on each client when a rage wave begins (ships in the client addon).</summary>
     public string RageWaveStartSound { get; set; } = "bossrush.ragewave.start";
 
-    // ── Patron combat (DESIGN.md #2) ──────────────────────────────────────────────
+    // ── Patron combat (DESIGN.md #2, §4) ──────────────────────────────────────────
     public float PatronLaserBaseDamage { get; set; } = 60.0f;
-    /// <summary>Added laser damage per minute — the Patron gets scarier as the match drags on.</summary>
+    /// <summary>Added laser/ult damage per minute — the Hidden King gets scarier as the match drags on.</summary>
     public float PatronLaserDamagePerMinute { get; set; } = 8.0f;
-    public float PatronLaserIntervalSeconds { get; set; } = 3.5f;
     public string PatronLaserParticle { get; set; } = "particles/bossrush/patron_laser.vpcf";
     public string PatronLaserSound { get; set; } = "bossrush.patron.laser";
-    /// <summary>How often the Patron rolls a random self-buff modifier.</summary>
+    /// <summary>How often the Hidden King rolls a random self-buff modifier.</summary>
     public float PatronBuffRollIntervalSeconds { get; set; } = 30.0f;
+
+    // ── Hidden King boss — multi-phase finale (DESIGN.md §4) ──────────────────────
+    /// <summary>Health bars to split the Patron's pool into; each lost bar escalates the fight.</summary>
+    public int BossHealthBars { get; set; } = 5;
+    /// <summary>Total Patron health to set on spawn (sizes the bars). 0 = keep its native health.</summary>
+    public int BossMaxHealth { get; set; } = 0;
+    /// <summary>How often (seconds) to poll the King's health for a bar transition.</summary>
+    public float BossPhasePollSeconds { get; set; } = 0.5f;
+    /// <summary>Seconds between the King's attacks at full health (cadence on the first bar).</summary>
+    public float BossAttackIntervalSeconds { get; set; } = 6.0f;
+    /// <summary>Seconds between attacks on the last bar — cadence shrinks to this as bars fall.</summary>
+    public float BossAttackIntervalMinSeconds { get; set; } = 1.5f;
+    /// <summary>Radius (units) of the King's AoE ults (lightning / barrage).</summary>
+    public float BossUltAoeRadius { get; set; } = 600.0f;
+    /// <summary>Extra ult damage added per health bar already lost.</summary>
+    public float BossUltDamagePerBar { get; set; } = 30.0f;
+    /// <summary>CC modifier for the "Rem — Naptime" sleep ult. Placeholder — real Deadlock sleep/stun TBD (decision #6).</summary>
+    public string BossSleepModifier { get; set; } = "modifier_bossrush_sleep";
 
     // ── Economy / items (DESIGN.md #4, #5, #6, #8) ────────────────────────────────
     /// <summary>Upgrade Station charges this multiple of an item's normal shop price to enhance it.</summary>
