@@ -15,7 +15,7 @@ namespace BossRush;
 /// durations. That replaced the dead-end managed <c>ToggleActivate</c> path. The simulated
 /// <c>Hurt</c>-based effects remain as a fallback (used when <see cref="BossRushConfig.BossUseNativeAbilities"/>
 /// is off, or a cvar is missing); they lack VFX/LoS, so native is the default. The "Rem — Naptime" sleep
-/// has no native equivalent and stays a CC modifier (real Deadlock sleep/stun name TBD). Every attack is
+/// has no native boss equivalent, so it applies Rem's real shipped sleep modifier `modifier_familiar_asleep`. Every attack is
 /// range-gated to the boss's engage range.
 /// </summary>
 public sealed class PatronCombatSystem
@@ -331,7 +331,11 @@ public sealed class PatronCombatSystem
 
         Chat.PrintToChatAll($"[Boss Rush] Hidden King casts {label} — sleep!");
         patron.EmitSound(_cfg.PatronLaserSound);
-        target.AddModifier(_cfg.BossSleepModifier); // placeholder CC; real Deadlock sleep/stun TBD
+        using (var kv = new KeyValues3())
+        {
+            kv.SetFloat("duration", _cfg.BossSleepDurationSeconds);
+            target.AddModifier(_cfg.BossSleepModifier, kv, caster: patron); // Rem's real sleep (modifier_familiar_asleep)
+        }
         target.Hurt(CurrentUltDamage * 0.25f, attacker: patron, inflictor: patron);
     }
 
