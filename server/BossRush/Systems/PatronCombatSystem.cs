@@ -66,7 +66,17 @@ public sealed class PatronCombatSystem
     /// and the simulated effect used as fallback.</summary>
     private sealed record UltDef(string Label, string? NativeCvar, SimKind Sim);
 
-    private static readonly UltDef[] Rotation =
+    // Live test: laser/shrine fire in phase 1; barrage/bomb/smash don't — they appear to be phase-2-gated
+    // on the native boss. So phase 1 uses only the confirmed kit (+ a guaranteed sim sleep for pressure);
+    // the heavy kit only enters the rotation once Phase 2 is forced at the midpoint bar.
+    private static readonly UltDef[] Phase1Rotation =
+    {
+        new("Hidden King — Laser",         "citadel_boss_tier_3_test_laser",         SimKind.Laser),
+        new("Hidden King — Shrine Attack", "citadel_boss_tier_3_test_shrine_attack", SimKind.LightningAoe),
+        new("Rem — Naptime",               null,                                     SimKind.Sleep),
+    };
+
+    private static readonly UltDef[] Phase2Rotation =
     {
         new("Hidden King — Laser",         "citadel_boss_tier_3_test_laser",         SimKind.Laser),
         new("McGinnis — Rocket Barrage",   "citadel_boss_tier_3_test_rocketbarrage", SimKind.BarrageAoe),
@@ -221,7 +231,8 @@ public sealed class PatronCombatSystem
 
     private void CastNextUlt(CBaseEntity patron)
     {
-        var def = Rotation[_ultCursor % Rotation.Length];
+        var active = _phase2Triggered ? Phase2Rotation : Phase1Rotation;
+        var def = active[_ultCursor % active.Length];
         _ultCursor++;
         Cast(patron, def);
     }
@@ -390,8 +401,8 @@ public sealed class PatronCombatSystem
     {
         var p = FindPatron();
         if (p == null) return false;
-        int n = Rotation.Length;
-        Cast(p, Rotation[((index % n) + n) % n]);
+        int n = Phase2Rotation.Length;
+        Cast(p, Phase2Rotation[((index % n) + n) % n]);
         return true;
     }
 
