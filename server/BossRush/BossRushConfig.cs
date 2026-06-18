@@ -91,6 +91,8 @@ public sealed class BossRushConfig
     public string BossSleepModifier { get; set; } = "modifier_familiar_asleep";
     /// <summary>How long the sleep lasts (Naptime is ~4s).</summary>
     public float BossSleepDurationSeconds { get; set; } = 4.0f;
+    /// <summary>Actually apply the sleep modifier. OFF until modifier_familiar_asleep's VData is loaded server-side via a VPK (P4) — applying an unregistered modifier just logs "VData not found". Flip on once the addon ships it.</summary>
+    public bool BossApplySleepModifier { get; set; } = false;
 
     // ── Economy / items (DESIGN.md #4, #5, #6, #8) ────────────────────────────────
     /// <summary>Upgrade Station charges this multiple of an item's normal shop price to enhance it.</summary>

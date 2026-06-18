@@ -318,12 +318,16 @@ public sealed class PatronCombatSystem
         var target = RandomHeroInRange(patron);
         if (target == null) return;
 
-        Chat.PrintToChatAll($"[Boss Rush] Hidden King casts {label} — sleep!");
+        Chat.PrintToChatAll($"[Boss Rush] Hidden King casts {label}!");
         patron.EmitSound(_cfg.PatronLaserSound);
-        using (var kv = new KeyValues3())
+        // Rem's real sleep (modifier_familiar_asleep) needs its VData loaded server-side — only possible
+        // by shipping it in a server-loaded VPK (P4). Precaching Rem does NOT register it. Until the addon
+        // ships it, applying it just logs "VData not found", so it's gated off; the ult still chips.
+        if (_cfg.BossApplySleepModifier)
         {
+            using var kv = new KeyValues3();
             kv.SetFloat("duration", _cfg.BossSleepDurationSeconds);
-            target.AddModifier(_cfg.BossSleepModifier, kv, caster: patron); // Rem's real sleep (modifier_familiar_asleep)
+            target.AddModifier(_cfg.BossSleepModifier, kv, caster: patron);
         }
         target.Hurt(CurrentUltDamage * 0.25f, attacker: patron, inflictor: patron);
     }

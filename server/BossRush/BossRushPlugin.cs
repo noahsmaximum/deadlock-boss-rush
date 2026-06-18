@@ -107,9 +107,8 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     public override void OnPrecacheResources()
     {
         Precache.AddResource(Config.PatronLaserParticle);
-        // Load Rem's ("familiar") content so modifier_familiar_asleep registers server-side — without it
-        // AddModifier reports "VData not found" (the boss's Naptime sleep). Takes effect on a fresh map/server.
-        Precache.AddHero(Heroes.Familiar);
+        // NOTE: Precache.AddHero(Heroes.Familiar) does NOT register modifier_familiar_asleep's VData
+        // (tested live) — the boss's real sleep needs that modifier shipped in a server-loaded VPK (P4).
         // TODO(P3/P4): precache rage-wave / station particles + custom sounds shipped in client addon.
     }
 
