@@ -321,4 +321,20 @@ public sealed partial class BossRushPlugin
         Console.WriteLine(msg);
         if (caller != null) Chat.PrintToChat(caller, msg);
     }
+
+    [Command("br_mod", Description = "Apply a modifier to yourself by name for testing (dev). e.g. br_mod modifier_familiar_asleep 4")]
+    public void CmdMod(CCitadelPlayerController caller, string modifier, string duration = "4")
+    {
+        var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
+        if (pawn == null) return;
+        if (!float.TryParse(duration, out var dur)) dur = 4f;
+
+        using var kv = new KeyValues3();
+        kv.SetFloat("duration", dur);
+        var mod = pawn.AddModifier(modifier, kv, caster: pawn);
+
+        var msg = $"[Boss Rush] AddModifier('{modifier}', {dur}s) => {(mod != null ? "applied" : "NULL (bad name?)")}";
+        Console.WriteLine(msg);
+        Chat.PrintToChat(caller, msg);
+    }
 }

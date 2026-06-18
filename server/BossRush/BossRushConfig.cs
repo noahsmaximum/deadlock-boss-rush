@@ -87,8 +87,10 @@ public sealed class BossRushConfig
     public int BossBarrageHits { get; set; } = 12;
     /// <summary>Seconds between simulated barrage hits.</summary>
     public float BossBarrageIntervalSeconds { get; set; } = 0.8f;
-    /// <summary>CC modifier for the "Rem — Naptime" sleep ult. Placeholder — real Deadlock sleep/stun TBD (decision #6).</summary>
-    public string BossSleepModifier { get; set; } = "modifier_bossrush_sleep";
+    /// <summary>The "Rem — Naptime" sleep CC. Rem's internal codename is "familiar"; CCitadel_Modifier_Familiar_Asleep : CCitadel_Modifier_Sleep (verified from the game schema dump).</summary>
+    public string BossSleepModifier { get; set; } = "modifier_familiar_asleep";
+    /// <summary>How long the sleep lasts (Naptime is ~4s).</summary>
+    public float BossSleepDurationSeconds { get; set; } = 4.0f;
 
     // ── Economy / items (DESIGN.md #4, #5, #6, #8) ────────────────────────────────
     /// <summary>Upgrade Station charges this multiple of an item's normal shop price to enhance it.</summary>
