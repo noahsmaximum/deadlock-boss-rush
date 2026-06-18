@@ -301,10 +301,11 @@ public sealed partial class BossRushPlugin
         if (caller != null) Chat.PrintToChat(caller, msg);
     }
 
-    [Command("br_bosscast", Description = "Fire the Hidden King's REAL native ability via ToggleActivate (dev). e.g. br_bosscast rocket_barrage")]
-    public void CmdBossCast(CCitadelPlayerController? caller = null, string abilitySubstr = "laser")
+    [Command("br_bossfire", Description = "Fire a REAL boss ability via its test cvar (dev). keys: laser, barrage, bomb, smash, shrine, phase2 [resetSec=1.5]")]
+    public void CmdBossFire(CCitadelPlayerController? caller = null, string ability = "laser", string resetSec = "1.5")
     {
-        var msg = $"[Boss Rush] {_patron.DebugCastNative(abilitySubstr)}";
+        if (!float.TryParse(resetSec, out var rs)) rs = 1.5f;
+        var msg = $"[Boss Rush] {_patron.DebugFireNative(ability, rs)}";
         Console.WriteLine(msg);
         if (caller != null) Chat.PrintToChat(caller, msg);
     }

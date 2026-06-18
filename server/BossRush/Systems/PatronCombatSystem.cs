@@ -8,21 +8,35 @@ namespace BossRush;
 /// own team-3 Patron) reworked into a multi-phase boss. We resolve the live enemy Patron (cached from
 /// <see cref="OnEntitySpawned"/>, fallback scan), split its health into
 /// <see cref="BossRushConfig.BossHealthBars"/> bars, and on every bar lost we escalate (shorter cadence
-/// + a transition ult).
+/// + a transition ult; Phase 2 forced at the midpoint).
 ///
-/// Live test (2026-06-17) confirmed the native Patron owns its real ability entities —
-/// <c>citadel_ability_tier3boss_{laser_beam,aoe_wave,rocket_barrage,drop_bombs}</c>. So each ult maps to
-/// a real ability and, when <see cref="BossRushConfig.BossUseNativeAbilities"/> is on, we fire it via
-/// <c>CCitadelAbilityComponent.ToggleActivate</c> (the component-agnostic activation path — we borrow any
-/// player's component, since that native call keys off the ability entity, not the component). The
-/// reliable <c>Hurt</c>-based simulation stays as the fallback / default until the native path is
-/// confirmed in-game (dw_br_bosscast). Every attack is **range-gated** to the boss's engage range so it
-/// can no longer hit heroes across the whole map. The "Rem — Naptime" sleep has no native equivalent, so
-/// it stays a CC modifier (real Deadlock sleep/stun name TBD).
+/// The boss fires its REAL abilities through its own AI via the game's <c>citadel_boss_tier_3_test_*</c>
+/// cvars (discovered live 2026-06-17) — real VFX, targeting, line-of-sight (dodgeable behind cover) and
+/// durations. That replaced the dead-end managed <c>ToggleActivate</c> path. The simulated
+/// <c>Hurt</c>-based effects remain as a fallback (used when <see cref="BossRushConfig.BossUseNativeAbilities"/>
+/// is off, or a cvar is missing); they lack VFX/LoS, so native is the default. The "Rem — Naptime" sleep
+/// has no native equivalent and stays a CC modifier (real Deadlock sleep/stun name TBD). Every attack is
+/// range-gated to the boss's engage range.
 /// </summary>
 public sealed class PatronCombatSystem
 {
     public const string PatronDesignerName = "npc_boss_tier3";
+
+    // The boss's real abilities are triggered by these game cvars (set 1 → fire via AI).
+    private const string CvarPhase2 = "citadel_boss_tier_3_testing_enter_phase2";
+    private static readonly Dictionary<string, string> NativeAbilityCvars = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["laser"]        = "citadel_boss_tier_3_test_laser",
+        ["barrage"]      = "citadel_boss_tier_3_test_rocketbarrage",
+        ["rocketbarrage"]= "citadel_boss_tier_3_test_rocketbarrage",
+        ["bomb"]         = "citadel_boss_tier_3_test_bomb",
+        ["bombs"]        = "citadel_boss_tier_3_test_bomb",
+        ["smash"]        = "citadel_boss_tier_3_test_arm_smash",
+        ["armsmash"]     = "citadel_boss_tier_3_test_arm_smash",
+        ["shrine"]       = "citadel_boss_tier_3_test_shrine_attack",
+        ["shrineattack"] = "citadel_boss_tier_3_test_shrine_attack",
+        ["phase2"]       = CvarPhase2,
+    };
 
     private readonly BossRushConfig _cfg;
     private readonly ITimer _timer;
@@ -34,8 +48,9 @@ public sealed class PatronCombatSystem
     private bool _running;
 
     private uint _patronHandle;
-    private int _barsConsumed; // health bars the King has lost so far (0..BossHealthBars)
-    private int _ultCursor;    // rotation position
+    private int _barsConsumed;     // health bars the King has lost so far (0..BossHealthBars)
+    private int _ultCursor;        // rotation position
+    private bool _phase2Triggered; // native Phase 2 forced once at the midpoint
 
     // Placeholder self-buff modifier names — replace with real Deadlock modifiers once known.
     private static readonly string[] RandomBuffs =
@@ -47,17 +62,18 @@ public sealed class PatronCombatSystem
 
     private enum SimKind { Laser, LightningAoe, BarrageAoe, Sleep }
 
-    /// <summary>One ult: a label, the real native ability to fire (null = no native equivalent), and the
-    /// simulated effect used as fallback / when native casting is off.</summary>
-    private sealed record UltDef(string Label, string? Native, SimKind Sim);
+    /// <summary>One ult: a label, the game cvar that fires the REAL ability (null = no native equivalent),
+    /// and the simulated effect used as fallback.</summary>
+    private sealed record UltDef(string Label, string? NativeCvar, SimKind Sim);
 
     private static readonly UltDef[] Rotation =
     {
-        new("Hidden King — Laser",      "citadel_ability_tier3boss_laser_beam",     SimKind.Laser),
-        new("Seven — Storm Cloud",      "citadel_ability_tier3boss_aoe_wave",       SimKind.LightningAoe),
-        new("McGinnis — Heavy Barrage", "citadel_ability_tier3boss_rocket_barrage", SimKind.BarrageAoe),
-        new("Hidden King — Drop Bombs", "citadel_ability_tier3boss_drop_bombs",     SimKind.BarrageAoe),
-        new("Rem — Naptime",            null,                                       SimKind.Sleep),
+        new("Hidden King — Laser",         "citadel_boss_tier_3_test_laser",         SimKind.Laser),
+        new("McGinnis — Rocket Barrage",   "citadel_boss_tier_3_test_rocketbarrage", SimKind.BarrageAoe),
+        new("Hidden King — Bombs",         "citadel_boss_tier_3_test_bomb",          SimKind.BarrageAoe),
+        new("Hidden King — Arm Smash",     "citadel_boss_tier_3_test_arm_smash",     SimKind.LightningAoe),
+        new("Hidden King — Shrine Attack", "citadel_boss_tier_3_test_shrine_attack", SimKind.LightningAoe),
+        new("Rem — Naptime",               null,                                     SimKind.Sleep),
     };
 
     public PatronCombatSystem(BossRushConfig cfg, ITimer timer)
@@ -72,6 +88,7 @@ public sealed class PatronCombatSystem
         _running = true;
         _barsConsumed = 0;
         _ultCursor = 0;
+        _phase2Triggered = false;
         _patronHandle = 0;
         _phasePoll = _timer.Every(((int)(_cfg.BossPhasePollSeconds * 1000)).Milliseconds(), PollPhase);
         _buffLoop = _timer.Every(((int)_cfg.PatronBuffRollIntervalSeconds).Seconds(), RollBuff);
@@ -93,7 +110,6 @@ public sealed class PatronCombatSystem
     {
         if (e.Entity.DesignerName != PatronDesignerName) return;
 
-        // Health/team settle a tick after the spawn event — defer, then accept only the Hidden King (team 2).
         uint handle = e.Entity.EntityHandle;
         _timer.NextTick(() =>
         {
@@ -101,6 +117,7 @@ public sealed class PatronCombatSystem
             if (p == null || !p.IsAlive || p.TeamNum != BossRushPlugin.EnemyTeam) return;
             _patronHandle = handle;
             _barsConsumed = 0;
+            _phase2Triggered = false;
             if (_cfg.BossMaxHealth > 0)
             {
                 p.MaxHealth = _cfg.BossMaxHealth;
@@ -110,8 +127,8 @@ public sealed class PatronCombatSystem
         });
     }
 
-    /// <summary>The live enemy Patron — cached handle first (revalidated as team 2), else the highest-health
-    /// enemy-team <c>npc_boss_tier3</c> (so dev-spawned test bosses win over the 12k native one).</summary>
+    /// <summary>The live enemy Patron — cached handle (revalidated as team 2), else the highest-health
+    /// enemy-team <c>npc_boss_tier3</c>.</summary>
     public CBaseEntity? FindPatron()
     {
         if (_patronHandle != 0)
@@ -156,6 +173,15 @@ public sealed class PatronCombatSystem
         Chat.PrintToChatAll(barsRemaining > 0
             ? $"[Boss Rush] The Hidden King roars — {barsRemaining} health bar(s) left, and angrier."
             : "[Boss Rush] The Hidden King is breaking!");
+
+        // Force the native Phase 2 once we're halfway down.
+        if (_cfg.BossUseNativeAbilities && !_phase2Triggered && _barsConsumed >= Math.Max(1, _cfg.BossHealthBars / 2))
+        {
+            ConVar.Find(CvarPhase2)?.SetInt(1);
+            _phase2Triggered = true;
+            Chat.PrintToChatAll("[Boss Rush] The Hidden King enters Phase 2!");
+        }
+
         CastNextUlt(patron); // escalation felt instantly on the transition
     }
 
@@ -202,8 +228,8 @@ public sealed class PatronCombatSystem
 
     private void Cast(CBaseEntity patron, UltDef def)
     {
-        // Prefer the real native ability when enabled and available; otherwise simulate the effect.
-        if (_cfg.BossUseNativeAbilities && def.Native != null && TryCastNative(patron, def.Native, def.Label))
+        // Prefer the boss's REAL ability (fired via its test cvar) when enabled; else simulate.
+        if (_cfg.BossUseNativeAbilities && def.NativeCvar != null && FireNativeAbility(def.NativeCvar, def.Label))
             return;
 
         switch (def.Sim)
@@ -215,35 +241,24 @@ public sealed class PatronCombatSystem
         }
     }
 
-    // ── Native ability casting (decision #6) ───────────────────────────────────────
+    // ── Native ability firing (via the boss's own test cvars) ───────────────────────
 
-    /// <summary>Fire one of the Patron's own ability entities via the component-agnostic ToggleActivate
-    /// path. Returns false (→ fall back to simulation) if the ability ent or a borrowable component is absent.</summary>
-    private bool TryCastNative(CBaseEntity patron, string abilityDesigner, string label)
+    /// <summary>Set the boss ability's test cvar to 1 (fires through the boss AI), then reset it so the
+    /// next trigger fires again. Returns false (→ fall back to simulation) if the cvar isn't found.</summary>
+    private bool FireNativeAbility(string cvar, string label)
     {
-        var ability = FindBossAbility(patron, abilityDesigner);
-        if (ability == null) return false;
-        var comp = BorrowAbilityComponent();
-        if (comp == null) return false;
+        var cv = ConVar.Find(cvar);
+        if (cv == null) return false;
 
-        comp.ToggleActivate(ability, true);
+        cv.SetInt(1);
+        if (_cfg.BossNativeResetSeconds > 0)
+            _timer.Once(((int)(_cfg.BossNativeResetSeconds * 1000)).Milliseconds(), () => ConVar.Find(cvar)?.SetInt(0));
+
         Chat.PrintToChatAll($"[Boss Rush] Hidden King: {label}");
-        patron.EmitSound(_cfg.PatronLaserSound);
         return true;
     }
 
-    /// <summary>The boss's own copy of an ability ent (same team, nearest to the boss).</summary>
-    private static CBaseEntity? FindBossAbility(CBaseEntity patron, string abilityDesigner) =>
-        Entities.All
-            .Where(e => e.DesignerName == abilityDesigner && e.TeamNum == patron.TeamNum)
-            .OrderBy(e => Vector3.DistanceSquared(e.Position, patron.Position))
-            .FirstOrDefault();
-
-    /// <summary>Any living player's ability component — ToggleActivate keys off the ability ent, not this.</summary>
-    private static CCitadelAbilityComponent? BorrowAbilityComponent() =>
-        Players.GetAllPawns().FirstOrDefault(p => p.Health > 0)?.AbilityComponent;
-
-    // ── Simulated ult effects (fallback / default) ─────────────────────────────────
+    // ── Simulated ult effects (fallback / when native is off) ──────────────────────
 
     private void FireLaser(CBaseEntity patron)
     {
@@ -260,7 +275,6 @@ public sealed class PatronCombatSystem
         target.Hurt(CurrentUltDamage, attacker: patron, inflictor: patron);
     }
 
-    /// <summary>Single AoE burst centred on an in-range hero (Seven-style).</summary>
     private void FireAoe(CBaseEntity patron, string label)
     {
         var focus = RandomHeroInRange(patron);
@@ -273,7 +287,7 @@ public sealed class PatronCombatSystem
         DamageInRadius(patron, center, CurrentUltDamage);
     }
 
-    /// <summary>Staggered multi-hit barrage over an in-range area (McGinnis / drop-bombs style).</summary>
+    /// <summary>Staggered multi-hit barrage over an in-range area (defaults ≈10s — config'd).</summary>
     private void FireBarrage(CBaseEntity patron, string label)
     {
         var focus = RandomHeroInRange(patron);
@@ -299,7 +313,6 @@ public sealed class PatronCombatSystem
         }
     }
 
-    /// <summary>The "Naptime" sleep: a CC modifier on an in-range hero + chip damage.</summary>
     private void FireSleep(CBaseEntity patron, string label)
     {
         var target = RandomHeroInRange(patron);
@@ -372,7 +385,7 @@ public sealed class PatronCombatSystem
                $"nextInterval={CurrentAttackInterval:F1}s ultDmg={CurrentUltDamage:F0} heroesInRange={inRange} native={_cfg.BossUseNativeAbilities}";
     }
 
-    /// <summary>Fire one rotation ult now via the normal Cast path (sim unless native is enabled).</summary>
+    /// <summary>Fire one rotation ult now via the normal Cast path (native if enabled, else sim).</summary>
     public bool DebugFireUlt(int index)
     {
         var p = FindPatron();
@@ -382,28 +395,20 @@ public sealed class PatronCombatSystem
         return true;
     }
 
-    /// <summary>Force the native ToggleActivate path on an ability matching <paramref name="abilitySubstr"/>.</summary>
-    public string DebugCastNative(string abilitySubstr)
+    /// <summary>Fire a real boss ability by key (laser/barrage/bomb/smash/shrine/phase2) or raw cvar.</summary>
+    public string DebugFireNative(string key, float resetSec)
     {
-        var patron = FindPatron();
-        if (patron == null) return "no enemy Patron found";
+        string cvar = NativeAbilityCvars.TryGetValue(key, out var c) ? c : key;
+        var cv = ConVar.Find(cvar);
+        if (cv == null) return $"cvar not found: {cvar}";
 
-        var ability = Entities.All.FirstOrDefault(e =>
-            !string.IsNullOrEmpty(e.DesignerName) &&
-            e.DesignerName.Contains("ability", StringComparison.OrdinalIgnoreCase) &&
-            e.DesignerName.Contains(abilitySubstr, StringComparison.OrdinalIgnoreCase) &&
-            e.TeamNum == patron.TeamNum);
-        if (ability == null) return $"no enemy-team ability ent matching '{abilitySubstr}'";
-
-        var comp = BorrowAbilityComponent();
-        if (comp == null) return "no living hero to borrow an ability component from";
-
-        comp.ToggleActivate(ability, true);
-        return $"ToggleActivate('{ability.DesignerName}') sent on team {ability.TeamNum} — watch the boss in-game";
+        cv.SetInt(1);
+        if (resetSec > 0)
+            _timer.Once(((int)(resetSec * 1000)).Milliseconds(), () => ConVar.Find(cvar)?.SetInt(0));
+        return $"set {cvar}=1" + (resetSec > 0 ? $" (auto-reset to 0 in {resetSec:F1}s)" : " (no auto-reset)");
     }
 
-    /// <summary>Promote the existing enemy Patron (resize to <paramref name="hp"/> if &gt; 0) and target it —
-    /// avoids spawning a duplicate boss for testing.</summary>
+    /// <summary>Promote the existing enemy Patron (resize to <paramref name="hp"/> if &gt; 0) and target it.</summary>
     public bool DebugPromote(int hp)
     {
         var patron = FindPatron();
@@ -411,6 +416,7 @@ public sealed class PatronCombatSystem
         if (hp > 0) { patron.MaxHealth = hp; patron.Health = hp; }
         _patronHandle = patron.EntityHandle;
         _barsConsumed = 0;
+        _phase2Triggered = false;
         return true;
     }
 }
