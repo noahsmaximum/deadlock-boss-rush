@@ -245,4 +245,80 @@ public sealed partial class BossRushPlugin
         Console.WriteLine(msg);
         Chat.PrintToChat(caller, msg);
     }
+
+    [Command("br_bossinfo", Description = "Report the Hidden King + its native ability entities (dev)")]
+    public void CmdBossInfo(CCitadelPlayerController? caller = null)
+    {
+        var status = _patron.DebugStatus();
+        Console.WriteLine($"[Boss Rush] {status}");
+        if (caller != null) Chat.PrintToChat(caller, status);
+
+        // The native Patron brings child ability ents (citadel_ability_tier3boss_*). List anything
+        // tier3-boss-related so we learn the real designer names to drive via AcceptInput (decision #6).
+        var ents = Entities.All
+            .Where(e => !string.IsNullOrEmpty(e.DesignerName) &&
+                        (e.DesignerName.Contains("tier3boss", StringComparison.OrdinalIgnoreCase) ||
+                         e.DesignerName.Contains("boss_tier3", StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        Console.WriteLine($"[Boss Rush] {ents.Count} tier3-boss-related ents:");
+        foreach (var e in ents)
+            Console.WriteLine($"  {e.DesignerName}  (class {e.Classname}, team {e.TeamNum}, hp {e.Health}, handle {e.EntityHandle})");
+    }
+
+    [Command("br_bossult", Description = "Fire one Hidden King ult now (dev). index: 0=laser 1=storm 2=barrage 3=bombs 4=sleep")]
+    public void CmdBossUlt(CCitadelPlayerController? caller = null, string index = "0")
+    {
+        if (!int.TryParse(index, out var i)) i = 0;
+        bool ok = _patron.DebugFireUlt(i);
+        var msg = ok
+            ? $"[Boss Rush] fired ult #{i}. {_patron.DebugStatus()}"
+            : "[Boss Rush] no Patron found — spawn npc_boss_tier3 first.";
+        Console.WriteLine(msg);
+        if (caller != null) Chat.PrintToChat(caller, msg);
+    }
+
+    [Command("br_bossinput", Description = "AcceptInput(<input>) on every ent whose designer contains <substr> — probe native ability triggers (dev)")]
+    public void CmdBossInput(CCitadelPlayerController? caller = null, string substr = "tier3boss", string input = "")
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            Console.WriteLine("[Boss Rush] usage: br_bossinput <designer-substr> <input>  (e.g. br_bossinput tier3boss_laser FireAbility)");
+            return;
+        }
+
+        var targets = Entities.All
+            .Where(e => !string.IsNullOrEmpty(e.DesignerName) &&
+                        e.DesignerName.Contains(substr, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        foreach (var e in targets)
+        {
+            e.AcceptInput(input);
+            Console.WriteLine($"[Boss Rush] AcceptInput('{input}') -> {e.DesignerName}");
+        }
+
+        var msg = $"[Boss Rush] sent '{input}' to {targets.Count} ent(s) matching '{substr}'";
+        Console.WriteLine(msg);
+        if (caller != null) Chat.PrintToChat(caller, msg);
+    }
+
+    [Command("br_bossfire", Description = "Fire a REAL boss ability via its test cvar (dev). keys: laser, barrage, bomb, smash, shrine, phase2 [resetSec=1.5]")]
+    public void CmdBossFire(CCitadelPlayerController? caller = null, string ability = "laser", string resetSec = "1.5")
+    {
+        if (!float.TryParse(resetSec, out var rs)) rs = 1.5f;
+        var msg = $"[Boss Rush] {_patron.DebugFireNative(ability, rs)}";
+        Console.WriteLine(msg);
+        if (caller != null) Chat.PrintToChat(caller, msg);
+    }
+
+    [Command("br_bosspromote", Description = "Target the existing team-2 Patron as the Hidden King (resize hp if given) — no duplicate spawn (dev)")]
+    public void CmdBossPromote(CCitadelPlayerController? caller = null, string hp = "0")
+    {
+        if (!int.TryParse(hp, out var hpVal)) hpVal = 0;
+        bool ok = _patron.DebugPromote(hpVal);
+        var msg = ok
+            ? $"[Boss Rush] promoted enemy Patron. {_patron.DebugStatus()}"
+            : "[Boss Rush] no team-2 Patron found to promote.";
+        Console.WriteLine(msg);
+        if (caller != null) Chat.PrintToChat(caller, msg);
+    }
 }

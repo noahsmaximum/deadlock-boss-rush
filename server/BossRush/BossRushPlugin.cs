@@ -48,7 +48,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
             : "[Boss Rush] loaded. Loot the lanes. Kill the Patron.");
-        Console.WriteLine("[Boss Rush] dev commands: br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave, br_heal, br_additem");
+        Console.WriteLine("[Boss Rush] dev commands (in-game prefix dw_): br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave, br_heal, br_additem, br_bossinfo, br_bossult, br_bossinput, br_bossfire, br_bosspromote");
     }
 
     public override void OnUnload()
@@ -129,10 +129,11 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         _upgrades.OnEntityTouch(args);
     }
 
-    /// <summary>Scale denizens up as they spawn; route loot containers if spawned dynamically.</summary>
+    /// <summary>Scale denizens up as they spawn; capture the Patron for the Hidden King fight.</summary>
     public override void OnEntitySpawned(EntitySpawnedEvent args)
     {
         _spawns.OnEntitySpawned(args);
+        _patron.OnEntitySpawned(args);
     }
 
     /// <summary>`!upgrade <item>` until the Upgrade-Station zone UX lands (P2).</summary>
