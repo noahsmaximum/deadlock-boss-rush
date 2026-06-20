@@ -50,8 +50,8 @@ public sealed class BossRushConfig
     public float RageWaveSquadFirstStepMinute { get; set; } = 20.0f;
     /// <summary>After the first bump, squad grows again every this many minutes (+5 / 10 min).</summary>
     public float RageWaveSquadStepMinutes { get; set; } = 10.0f;
-    /// <summary>Soundevent fired on each client when a rage wave begins (ships in the client addon).</summary>
-    public string RageWaveStartSound { get; set; } = "bossrush.ragewave.start";
+    /// <summary>Rage-wave soundevent. Stock MidBoss.Arrive (Base.MapObjective = global/2D, ~10s dramatic stinger) from gameplay.vsndevts; no addon needed.</summary>
+    public string RageWaveStartSound { get; set; } = "MidBoss.Arrive";
 
     // ── Patron combat (DESIGN.md #2, §4) ──────────────────────────────────────────
     public float PatronLaserBaseDamage { get; set; } = 60.0f;
