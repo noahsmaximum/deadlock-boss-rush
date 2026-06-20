@@ -48,7 +48,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
             : "[Boss Rush] loaded. Loot the lanes. Kill the Patron.");
-        Console.WriteLine("[Boss Rush] dev commands (in-game prefix dw_): br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave, br_heal, br_additem, br_bossinfo, br_bossult, br_bossinput, br_bossfire, br_bosspromote, br_mod, br_sound, br_reloadcfg");
+        Console.WriteLine("[Boss Rush] dev commands (in-game prefix dw_): br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave, br_heal, br_additem, br_bossinfo, br_bossult, br_bossinput, br_bossfire, br_bosspromote, br_mod, br_sound, br_reloadcfg, br_allitems, br_randomitems, br_level, br_doubleguardians, br_bosscd");
     }
 
     public override void OnUnload()
@@ -106,7 +106,19 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
 
     public override void OnPrecacheResources()
     {
+        // Boss-ult VFX (real shipped tier3boss/patron particles). Precache runs on MAP LOAD — a plugin
+        // hot-reload does NOT re-run it, so newly added particles only register after a map change/restart.
         Precache.AddResource(Config.PatronLaserParticle);
+        Precache.AddResource(Config.BossExplodeParticle);
+        Precache.AddResource(Config.BossBarrageParticle);
+        Precache.AddResource(Config.BossStormCloudParticle);
+        Precache.AddResource(Config.BossStormBoltParticle);
+        Precache.AddResource(Config.BossStormStrikeParticle);
+        Precache.AddResource(Config.BossStormZapParticle);
+        Precache.AddResource(Config.BossChargeChargeParticle);
+        Precache.AddResource(Config.BossChargeGroundParticle);
+        Precache.AddResource(Config.BossChargeExplodeParticle);
+        Precache.AddResource(Config.BossChargeWaveParticle);
         // NOTE: Precache.AddHero(Heroes.Familiar) does NOT register modifier_familiar_asleep's VData
         // (tested live) — the boss's real sleep needs that modifier shipped in a server-loaded VPK (P4).
         // TODO(P3/P4): precache rage-wave / station particles + custom sounds shipped in client addon.
