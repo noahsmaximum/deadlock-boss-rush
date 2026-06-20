@@ -361,4 +361,33 @@ public sealed partial class BossRushPlugin
         Console.WriteLine(msg);
         if (caller != null) Chat.PrintToChat(caller, msg);
     }
+
+    [Command("br_allitems", Description = "Dev: give yourself every item + set level + souls for testing. e.g. br_allitems [level=30]")]
+    public void CmdAllItems(CCitadelPlayerController caller, string level = "30")
+    {
+        var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
+        if (pawn == null) return;
+
+        if (int.TryParse(level, out var lvl) && lvl > 0) pawn.Level = lvl;
+        pawn.ModifyCurrency(ECurrencyType.EGold, 1_000_000, ECurrencySource.ECheats, forceGain: true);
+
+        // Item names are data, not code — regenerate via Source2Viewer-CLI on abilities.vdata_c (upgrade_* top-level keys).
+        var listPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "deadlock_dumps", "all_items.txt");
+
+        int added = 0, failed = 0;
+        if (File.Exists(listPath))
+            foreach (var raw in File.ReadAllLines(listPath))
+            {
+                var n = raw.Trim();
+                if (n.Length == 0 || n.StartsWith("//")) continue;
+                if (pawn.AddItem(n) != null) added++; else failed++;
+            }
+
+        var msg = File.Exists(listPath)
+            ? $"[Boss Rush] level={pawn.Level}, +1M souls, items: {added} added / {failed} failed (of {added + failed})."
+            : $"[Boss Rush] level={pawn.Level}, +1M souls. Item list missing: {listPath}";
+        Console.WriteLine(msg);
+        Chat.PrintToChat(caller, msg);
+    }
 }
