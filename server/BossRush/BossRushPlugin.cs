@@ -41,14 +41,14 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         _spawns = new SpawnDirector(Config, Timer);
         _rageWaves = new RageWaveSystem(Config, Timer);
         _patron = new PatronCombatSystem(Config, Timer);
-        _loot = new LootSystem(Config, _enhancements);
+        _loot = new LootSystem(Config, _enhancements, Timer);
         _upgrades = new UpgradeStation(Config, _enhancements);
         _regen = new RegenSystem(Config, Timer);
 
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
             : "[Boss Rush] loaded. Loot the lanes. Kill the Patron.");
-        Console.WriteLine("[Boss Rush] dev commands (in-game prefix dw_): br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave, br_heal, br_additem, br_bossinfo, br_bossult, br_bossinput, br_bossfire, br_bosspromote, br_mod, br_sound, br_reloadcfg, br_allitems, br_randomitems, br_level, br_doubleguardians, br_bosscd");
+        Console.WriteLine("[Boss Rush] dev commands (in-game prefix dw_): br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave, br_heal, br_additem, br_bossinfo, br_bossult, br_bossinput, br_bossfire, br_bosspromote, br_mod, br_sound, br_reloadcfg, br_allitems, br_randomitems, br_level, br_doubleguardians, br_loot, br_crates, br_bosscd");
     }
 
     public override void OnUnload()
@@ -89,6 +89,19 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         // Buying happens at Upgrade Stations, not anywhere — but allow for now while prototyping.
         ConVar.Find("citadel_allow_purchasing_anywhere")?.SetInt(1);
         ConVar.Find("citadel_allow_duplicate_heroes")?.SetInt(1);
+
+        // Front-load loot crates: spawn them at match start instead of after the default delay (the bridge-buff
+        // powerup spawners are a separate system and untouched). Convar names confirmed in server.dll.
+        if (Config.FrontloadCrates)
+        {
+            ConVar.Find("citadel_crate_spawn_enabled")?.SetInt(1);
+            ConVar.Find("citadel_crate_spawn_initial_delay")?.SetInt(0);
+            ConVar.Find("citadel_crate_early_to_trooper_spawn_delay")?.SetInt(0);
+            // Force the world breakables/props out from t=0 as well.
+            ConVar.Find("citadel_breakable_prop_initial_spawn_time_override")?.SetInt(0);
+            if (Config.CrateRespawnIntervalSeconds >= 0)
+                ConVar.Find("citadel_crate_respawn_interval")?.SetInt(Config.CrateRespawnIntervalSeconds);
+        }
         // Hero health regen is handled by RegenSystem (custom rate) — sv_regeneration_force_on has
         // no rate cvar in Deadlock, so it can't be slowed.
 
@@ -148,6 +161,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     {
         _spawns.OnEntitySpawned(args);
         _patron.OnEntitySpawned(args);
+        _loot.OnEntitySpawned(args);
     }
 
     /// <summary>`!upgrade <item>` until the Upgrade-Station zone UX lands (P2).</summary>

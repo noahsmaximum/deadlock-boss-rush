@@ -456,6 +456,33 @@ public sealed partial class BossRushPlugin
         Chat.PrintToChat(caller, msg);
     }
 
+    [Command("br_crates", Description = "Dev: print the crate-spawn convar values (front-load diagnostic).")]
+    public void CmdCrates(CCitadelPlayerController caller)
+    {
+        string[] names =
+        {
+            "citadel_crate_spawn_enabled", "citadel_crate_spawn_initial_delay",
+            "citadel_crate_early_to_trooper_spawn_delay", "citadel_crate_respawn_interval",
+            "citadel_breakable_prop_initial_spawn_time_override",
+        };
+        Console.WriteLine("[Boss Rush] crate convars:");
+        foreach (var nm in names)
+            Console.WriteLine($"  {nm} = {ConVar.Find(nm)?.GetString() ?? "<not found>"}");
+        Chat.PrintToChat(caller, "[Boss Rush] crate convars printed to console.");
+    }
+
+    [Command("br_loot", Description = "Dev: grant N random loot items to yourself (bypasses drop chance). e.g. br_loot [count=1]")]
+    public void CmdLoot(CCitadelPlayerController caller, string count = "1")
+    {
+        var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
+        if (pawn == null) return;
+        int n = int.TryParse(count, out var c) && c > 0 ? c : 1;
+        for (int i = 0; i < n; i++) _loot.GrantLoot(pawn);
+        var msg = $"[Boss Rush] granted {n} loot roll(s). pool={_loot.PoolSize} ({_loot.TierSummary})";
+        Console.WriteLine(msg);
+        Chat.PrintToChat(caller, msg);
+    }
+
     [Command("br_bosscd", Description = "List + zero the boss's ability cooldowns (dev) — does it then attack?")]
     public void CmdBossCd(CCitadelPlayerController? caller = null)
     {

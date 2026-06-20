@@ -187,6 +187,45 @@ public sealed class BossRushConfig
     /// <summary>Timed enhancements expire after this long unless the player dies first.</summary>
     public float EnhancementDurationSeconds { get; set; } = 300.0f; // 5 minutes
 
+    // ── World loot (DESIGN.md #4, #6 — power from the world) ──────────────────────
+    /// <summary>Master switch: breaking world containers (boxes / golden buddhas) can drop items.</summary>
+    public bool LootEnabled { get; set; } = true;
+    /// <summary>The entities a broken container drops — detected on SPAWN (damage/touch hooks don't fire for props),
+    /// so a box breaking by any means is caught when its drop appears. Most boxes drop a modifier pickup, fewer drop
+    /// gold; listening on both covers nearly every break. Loot goes to the nearest hero.</summary>
+    public string[] LootPickupDesignerNames { get; set; } =
+    {
+        "citadel_breakable_prop_gold_pickup",
+        "citadel_breakable_prop_modifier_pickup",
+    };
+    /// <summary>Max distance (units) from a broken container to attribute its loot to a hero (generous — breaks land
+    /// ~90–130u away on melee/slide, up to ~900u on ranged shots).</summary>
+    public float LootNearRadius { get; set; } = 1500.0f;
+    /// <summary>Chance (0–1) that breaking a container drops an item. Each container gives exactly one roll.
+    /// Interim value — revisit when we set rarity tiers/rates.</summary>
+    public float LootDropChance { get; set; } = 0.3f;
+    /// <summary>Tell the looter in chat what they found.</summary>
+    public bool LootAnnounce { get; set; } = true;
+
+    // ── Loot rarity by match time — relative weights per tier [T1,T2,T3,T4,T5=legendary] ──
+    /// <summary>Minutes: end of the early bracket.</summary>
+    public float LootTierBracket1Minutes { get; set; } = 5f;
+    /// <summary>Minutes: end of the mid bracket (after this is the late bracket).</summary>
+    public float LootTierBracket2Minutes { get; set; } = 10f;
+    /// <summary>0–5 min: mostly T1, T2 rare.</summary>
+    public float[] LootTierWeightsEarly { get; set; } = { 85, 15, 0, 0, 0 };
+    /// <summary>5–10 min: T1 &amp; T2 mostly, T3 rare.</summary>
+    public float[] LootTierWeightsMid { get; set; } = { 45, 45, 10, 0, 0 };
+    /// <summary>10+ min: T2/T3 common, T1/T4 rare, legendaries (T5) insanely rare.</summary>
+    public float[] LootTierWeightsLate { get; set; } = { 10, 38, 40, 11, 1 };
+
+    // ── Front-load loot — spawn crates at match start via the game's crate convars ──
+    /// <summary>Spawn loot crates at match start instead of after the default delay (bridge-buff powerup spawners
+    /// are separate and left alone). Zeros the citadel_crate_* spawn-delay convars in ApplyRuleset.</summary>
+    public bool FrontloadCrates { get; set; } = true;
+    /// <summary>citadel_crate_respawn_interval (seconds) — how fast broken crates return. -1 = leave the game default.</summary>
+    public int CrateRespawnIntervalSeconds { get; set; } = -1;
+
     // ── Items beyond the 12 visible slots (DESIGN.md #7, §3) ──────────────────────
     // No cap to configure: under the Street Brawl ruleset, AddItem keeps granting items past the
     // 12 visible slots (they stay equipped, just hidden). Showing them is an optional client HUD.
