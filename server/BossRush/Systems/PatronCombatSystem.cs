@@ -68,11 +68,17 @@ public sealed class PatronCombatSystem
     /// and the simulated effect used as fallback.</summary>
     private sealed record UltDef(string Label, string? NativeCvar, SimKind Sim);
 
-    // The rotation casts hero-fantasy ults as scripted sims with REAL shipped particles (the boss can't
-    // actually cast hero abilities). NativeCvar is the boss's own equivalent ability, forced only when
-    // BossUseNativeAbilities is on (off by default — see config). The boss owns every hit in the kill feed
-    // (Hurt(attacker: patron)), which sidesteps spawning real hero entities just to attribute damage.
-    private static readonly UltDef[] Rotation =
+    // The rotation casts hero-fantasy ults as scripted sims with REAL shipped particles (the boss can't actually
+    // cast hero abilities). NativeCvar is the boss's own equivalent ability, forced only when BossUseNativeAbilities
+    // is on (off by default). The boss owns every hit in the kill feed (Hurt(attacker: patron)). Phase-aware: the
+    // King opens with a lighter kit and unlocks the heavy ults (Storm Cloud, Bomb Blast) once Phase 2 triggers.
+    private static readonly UltDef[] Phase1Rotation =
+    {
+        new("Hidden King — Laser",       "citadel_boss_tier_3_test_laser",         SimKind.Laser),
+        new("McGinnis — Rocket Barrage", "citadel_boss_tier_3_test_rocketbarrage", SimKind.BarrageAoe),
+    };
+
+    private static readonly UltDef[] Phase2Rotation =
     {
         new("Hidden King — Laser",       "citadel_boss_tier_3_test_laser",         SimKind.Laser),
         new("McGinnis — Rocket Barrage", "citadel_boss_tier_3_test_rocketbarrage", SimKind.BarrageAoe),
