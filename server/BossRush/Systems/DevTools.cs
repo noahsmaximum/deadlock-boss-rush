@@ -107,7 +107,9 @@ public sealed partial class BossRushPlugin
     // lane/spawner context (CCitadelTrooper derefs a null lane). Refuse rather than AV the server.
     private static readonly HashSet<string> UnsafeToSpawn = new(StringComparer.OrdinalIgnoreCase)
     {
+        // Objective/lane NPCs crash on a direct CreateByDesignerName+Spawn — they need the game's own spawn path.
         "npc_trooper", "npc_super_trooper",
+        "npc_trooper_boss", "npc_barrack_boss", "npc_boss_tier1", "npc_boss_tier2", "npc_boss_tier3",
     };
 
     [Command("br_spawn", Description = "Spawn one entity by designer name in front of you (dev)")]
@@ -362,32 +364,103 @@ public sealed partial class BossRushPlugin
         if (caller != null) Chat.PrintToChat(caller, msg);
     }
 
-    [Command("br_allitems", Description = "Dev: give yourself every item + set level + souls for testing. e.g. br_allitems [level=30]")]
+    // Item names are data, not code — regenerate via Source2Viewer-CLI on abilities.vdata_c (upgrade_* top-level keys).
+    private static string ItemListPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "deadlock_dumps", "all_items.txt");
+
+    private static List<string> LoadItemNames()
+    {
+        var list = new List<string>();
+        if (File.Exists(ItemListPath))
+            foreach (var raw in File.ReadAllLines(ItemListPath))
+            {
+                var n = raw.Trim();
+                if (n.Length > 0 && !n.StartsWith("//")) list.Add(n);
+            }
+        return list;
+    }
+
+    /// <summary>Set level AND grant the souls + ability points + unlocks needed to fully kit out a hero.
+    /// pawn.Level alone only yields the few auto-granted points (the "6 points / one ability" bug) — the
+    /// ability-unlock/upgrade economy is the separate EAbilityPoints / EAbilityUnlocks currencies.</summary>
+    private static void GrantFullPower(CCitadelPlayerPawn pawn, int level)
+    {
+        if (level > 0) pawn.Level = level;
+        pawn.ModifyCurrency(ECurrencyType.EGold, 1_000_000, ECurrencySource.ECheats, forceGain: true);
+        pawn.ModifyCurrency(ECurrencyType.EAbilityPoints, 50, ECurrencySource.ECheats, forceGain: true);
+        pawn.ModifyCurrency(ECurrencyType.EAbilityUnlocks, 16, ECurrencySource.ECheats, forceGain: true);
+    }
+
+    [Command("br_allitems", Description = "Dev: give yourself every item + level + souls + ability points. e.g. br_allitems [level=30]")]
     public void CmdAllItems(CCitadelPlayerController caller, string level = "30")
     {
         var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
         if (pawn == null) return;
 
-        if (int.TryParse(level, out var lvl) && lvl > 0) pawn.Level = lvl;
-        pawn.ModifyCurrency(ECurrencyType.EGold, 1_000_000, ECurrencySource.ECheats, forceGain: true);
+        int lvl = int.TryParse(level, out var l) && l > 0 ? l : 30;
+        GrantFullPower(pawn, lvl);
 
-        // Item names are data, not code — regenerate via Source2Viewer-CLI on abilities.vdata_c (upgrade_* top-level keys).
-        var listPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "deadlock_dumps", "all_items.txt");
-
+        var all = LoadItemNames();
         int added = 0, failed = 0;
-        if (File.Exists(listPath))
-            foreach (var raw in File.ReadAllLines(listPath))
-            {
-                var n = raw.Trim();
-                if (n.Length == 0 || n.StartsWith("//")) continue;
-                if (pawn.AddItem(n) != null) added++; else failed++;
-            }
+        foreach (var n in all)
+            if (pawn.AddItem(n) != null) added++; else failed++;
 
-        var msg = File.Exists(listPath)
-            ? $"[Boss Rush] level={pawn.Level}, +1M souls, items: {added} added / {failed} failed (of {added + failed})."
-            : $"[Boss Rush] level={pawn.Level}, +1M souls. Item list missing: {listPath}";
+        var msg = all.Count > 0
+            ? $"[Boss Rush] level={pawn.Level}, +1M souls + AP, items: {added} added / {failed} failed (of {added + failed})."
+            : $"[Boss Rush] level={pawn.Level}, +1M souls + AP. Item list missing: {ItemListPath}";
         Console.WriteLine(msg);
         Chat.PrintToChat(caller, msg);
+    }
+
+    [Command("br_randomitems", Description = "Dev: random N items (default 18) + level + souls + ability points. e.g. br_randomitems [count=18] [level=30]")]
+    public void CmdRandomItems(CCitadelPlayerController caller, string count = "18", string level = "30")
+    {
+        var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
+        if (pawn == null) return;
+
+        int n = int.TryParse(count, out var c) && c > 0 ? c : 18;
+        int lvl = int.TryParse(level, out var l) && l > 0 ? l : 30;
+        GrantFullPower(pawn, lvl);
+
+        var all = LoadItemNames();
+        if (all.Count == 0) { Chat.PrintToChat(caller, $"[Boss Rush] item list missing: {ItemListPath}"); return; }
+
+        var rng = new Random();
+        var pick = all.OrderBy(_ => rng.Next()).Take(Math.Min(n, all.Count)).ToList();
+        int added = 0, failed = 0;
+        foreach (var name in pick)
+            if (pawn.AddItem(name) != null) added++; else failed++;
+
+        var msg = $"[Boss Rush] level={pawn.Level}, +1M souls + AP, random items: {added} added / {failed} failed (requested {n} of {all.Count}).";
+        Console.WriteLine(msg);
+        Chat.PrintToChat(caller, msg);
+    }
+
+    [Command("br_level", Description = "Dev: set level + grant souls/ability points/unlocks (no items). e.g. br_level [level=30]")]
+    public void CmdLevel(CCitadelPlayerController caller, string level = "30")
+    {
+        var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
+        if (pawn == null) return;
+        int lvl = int.TryParse(level, out var l) && l > 0 ? l : 30;
+        GrantFullPower(pawn, lvl);
+        var msg = $"[Boss Rush] level={pawn.Level}, +1M souls, +50 AP, +16 unlocks. Unlock/upgrade abilities now.";
+        Console.WriteLine(msg);
+        Chat.PrintToChat(caller, msg);
+    }
+
+    [Command("br_doubleguardians", Description = "Dev: spawn a twin next to each enemy Guardian (fight 2 instead of 1).")]
+    public void CmdDoubleGuardians(CCitadelPlayerController caller)
+    {
+        var msg = _spawns.DoubleGuardiansNow();
+        Console.WriteLine(msg);
+        Chat.PrintToChat(caller, msg);
+    }
+
+    [Command("br_bosscd", Description = "List + zero the boss's ability cooldowns (dev) — does it then attack?")]
+    public void CmdBossCd(CCitadelPlayerController? caller = null)
+    {
+        var msg = $"[Boss Rush] {_patron.DebugAbilities()}";
+        Console.WriteLine(msg);
+        if (caller != null) Chat.PrintToChat(caller, msg);
     }
 }
