@@ -50,7 +50,8 @@ public sealed class PatronCombatSystem
     private uint _patronHandle;
     private int _barsConsumed;     // health bars the King has lost so far (0..BossHealthBars)
     private int _ultCursor;        // rotation position
-    private bool _phase2Triggered; // native Phase 2 forced once at the midpoint
+    private bool _phase2Triggered; // native Phase 2 cvar forced once at the midpoint (optional)
+    private bool _heavyKitUnlocked; // rotation escalated to the heavy ults at the midpoint (always)
     private int _bossPool;         // intended total health — survives native phase resets that wipe MaxHealth
     private float _lastFrac = 1f;  // last polled health fraction, used to restore the pool after a native reset
 
@@ -99,6 +100,7 @@ public sealed class PatronCombatSystem
         _barsConsumed = 0;
         _ultCursor = 0;
         _phase2Triggered = false;
+        _heavyKitUnlocked = false;
         _patronHandle = 0;
         _bossPool = 0;
         _lastFrac = 1f;
@@ -132,6 +134,7 @@ public sealed class PatronCombatSystem
             _patronHandle = handle;
             _barsConsumed = 0;
             _phase2Triggered = false;
+            _heavyKitUnlocked = false;
             _lastFrac = 1f;
             if (_cfg.BossMaxHealth > 0)
             {
@@ -201,15 +204,22 @@ public sealed class PatronCombatSystem
             ? $"[Boss Rush] The Hidden King roars — {barsRemaining} health bar(s) left, and angrier."
             : "[Boss Rush] The Hidden King is breaking!");
 
-        // Force the native Phase 2 once we're halfway down. OFF by default: the native transition resets the
-        // boss's health to its small native pool — PollPhase restores our inflated pool from _lastFrac, but
-        // that restore is unverified, so the stable 5-bar pool is the default. Flip BossForceNativePhase2 on
-        // to test whether the health-restore survives the transition.
-        if (_cfg.BossForceNativePhase2 && !_phase2Triggered && _barsConsumed >= Math.Max(1, _cfg.BossHealthBars / 2))
+        bool atMidpoint = _barsConsumed >= Math.Max(1, _cfg.BossHealthBars / 2);
+
+        // Unlock the heavy ult kit (Storm Cloud, Bomb Blast) at the midpoint — driven by bars lost, NOT by the
+        // native phase-2 cvar (which wipes health), so the escalation happens regardless of BossForceNativePhase2.
+        if (atMidpoint && !_heavyKitUnlocked)
+        {
+            _heavyKitUnlocked = true;
+            Chat.PrintToChatAll("[Boss Rush] The Hidden King enters Phase 2 — its full kit unleashed!");
+        }
+
+        // Optionally also force the NATIVE phase 2 (the in-engine transition). OFF by default: it resets the boss
+        // to its small native pool — PollPhase restores our inflated pool from _lastFrac, but that's unverified.
+        if (_cfg.BossForceNativePhase2 && !_phase2Triggered && atMidpoint)
         {
             ConVar.Find(CvarPhase2)?.SetInt(1);
             _phase2Triggered = true;
-            Chat.PrintToChatAll("[Boss Rush] The Hidden King enters Phase 2!");
         }
 
         CastNextUlt(patron); // escalation felt instantly on the transition
@@ -252,7 +262,7 @@ public sealed class PatronCombatSystem
 
     private void CastNextUlt(CBaseEntity patron)
     {
-        var active = _phase2Triggered ? Phase2Rotation : Phase1Rotation;
+        var active = _heavyKitUnlocked ? Phase2Rotation : Phase1Rotation;
         var def = active[_ultCursor % active.Length];
         _ultCursor++;
         Cast(patron, def);
@@ -659,6 +669,7 @@ public sealed class PatronCombatSystem
         _patronHandle = patron.EntityHandle;
         _barsConsumed = 0;
         _phase2Triggered = false;
+        _heavyKitUnlocked = false;
         _lastFrac = 1f;
         return true;
     }
