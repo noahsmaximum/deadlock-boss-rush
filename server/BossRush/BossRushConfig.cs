@@ -182,9 +182,21 @@ public sealed class BossRushConfig
     // ── Economy / items (DESIGN.md #4, #5, #6, #8) ────────────────────────────────
     /// <summary>Upgrade Station charges this multiple of an item's normal shop price to enhance it.</summary>
     public float UpgradeCostMultiplier { get; set; } = 2.0f;
+    /// <summary>Base shop price per tier [index 0 unused, then T1..T5] — mirrors m_nItemPricePerTier.</summary>
+    public int[] ItemTierPrices { get; set; } = { 0, 800, 1600, 3200, 6400, 9999 };
+    /// <summary>Flat soul cost to buy a legendary (top-tier) item from the store.</summary>
+    public int LegendaryPrice { get; set; } = 25000;
+    /// <summary>Which tier counts as "legendary" — buyable at the store; everything below is loot-only.</summary>
+    public int LegendaryTier { get; set; } = 5;
+    /// <summary>EXPERIMENTAL: block native shop purchases server-side. OFF by default — the currency hook has no item
+    /// context, so this blocks ALL native item buys (legendaries/enhances then go through the station commands). It
+    /// may make items free rather than blocked — verify in-game. The real storefront→station UI is a client mod.</summary>
+    public bool BlockNativePurchases { get; set; } = false;
     /// <summary>Chance (0–1) that a world drop rolls an *enhanced* item instead of a base one. Keep tiny.</summary>
     public float EnhancedDropChance { get; set; } = 0.01f;
-    /// <summary>Timed enhancements expire after this long unless the player dies first.</summary>
+    /// <summary>Enhancements are permanent (no timer, survive death). Flip off to use the timed behavior below.</summary>
+    public bool EnhancementPermanent { get; set; } = true;
+    /// <summary>If not permanent, timed enhancements expire after this long unless the player dies first.</summary>
     public float EnhancementDurationSeconds { get; set; } = 300.0f; // 5 minutes
 
     // ── World loot (DESIGN.md #4, #6 — power from the world) ──────────────────────
@@ -202,8 +214,8 @@ public sealed class BossRushConfig
     /// ~90–130u away on melee/slide, up to ~900u on ranged shots).</summary>
     public float LootNearRadius { get; set; } = 1500.0f;
     /// <summary>Chance (0–1) that breaking a container drops an item. Each container gives exactly one roll.
-    /// Interim value — revisit when we set rarity tiers/rates.</summary>
-    public float LootDropChance { get; set; } = 0.3f;
+    /// Tuned up for a full 6-player team — everyone needs to be finding gear.</summary>
+    public float LootDropChance { get; set; } = 0.6f;
     /// <summary>Tell the looter in chat what they found.</summary>
     public bool LootAnnounce { get; set; } = true;
 
@@ -223,8 +235,11 @@ public sealed class BossRushConfig
     /// <summary>Spawn loot crates at match start instead of after the default delay (bridge-buff powerup spawners
     /// are separate and left alone). Zeros the citadel_crate_* spawn-delay convars in ApplyRuleset.</summary>
     public bool FrontloadCrates { get; set; } = true;
-    /// <summary>citadel_crate_respawn_interval (seconds) — how fast broken crates return. -1 = leave the game default.</summary>
-    public int CrateRespawnIntervalSeconds { get; set; } = -1;
+    /// <summary>citadel_crate_respawn_interval (seconds) — how fast broken crates return. -1 = leave the game default (~360).</summary>
+    public int CrateRespawnIntervalSeconds { get; set; } = 120;
+    /// <summary>citadel_breakable_prop_spawn_interval_override (seconds) — how fast broken world breakables (the bulk
+    /// loot source) repopulate, so the mid-game isn't a drought. -1 = leave the game default.</summary>
+    public int BreakableRespawnSeconds { get; set; } = 90;
 
     // ── Items beyond the 12 visible slots (DESIGN.md #7, §3) ──────────────────────
     // No cap to configure: under the Street Brawl ruleset, AddItem keeps granting items past the

@@ -48,7 +48,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
             : "[Boss Rush] loaded. Loot the lanes. Kill the Patron.");
-        Console.WriteLine("[Boss Rush] dev commands (in-game prefix dw_): br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave, br_heal, br_additem, br_bossinfo, br_bossult, br_bossinput, br_bossfire, br_bosspromote, br_mod, br_sound, br_reloadcfg, br_allitems, br_randomitems, br_level, br_doubleguardians, br_loot, br_crates, br_bosscd");
+        Console.WriteLine("[Boss Rush] dev commands (in-game prefix dw_): br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave, br_heal, br_additem, br_bossinfo, br_bossult, br_bossinput, br_bossfire, br_bosspromote, br_mod, br_sound, br_reloadcfg, br_allitems, br_randomitems, br_level, br_doubleguardians, br_loot, br_crates, br_enhance, br_buylegendary, br_bosscd");
     }
 
     public override void OnUnload()
@@ -101,6 +101,9 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
             ConVar.Find("citadel_breakable_prop_initial_spawn_time_override")?.SetInt(0);
             if (Config.CrateRespawnIntervalSeconds >= 0)
                 ConVar.Find("citadel_crate_respawn_interval")?.SetInt(Config.CrateRespawnIntervalSeconds);
+            // Repopulate the world breakables (the bulk loot source) faster so the mid-game isn't a drought.
+            if (Config.BreakableRespawnSeconds >= 0)
+                ConVar.Find("citadel_breakable_prop_spawn_interval_override")?.SetInt(Config.BreakableRespawnSeconds);
         }
         // Hero health regen is handled by RegenSystem (custom rate) — sv_regeneration_force_on has
         // no rate cvar in Deadlock, so it can't be slowed.
@@ -114,6 +117,19 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     {
         if (args.Entity.As<CCitadelPlayerPawn>() is { } pawn)
             _regen.OnHeroDamaged(pawn);
+        return HookResult.Continue;
+    }
+
+    /// <summary>EXPERIMENTAL: buying base items outright is gone. The currency hook carries no item identity, so
+    /// when enabled this blocks ALL native item purchases (EItemPurchase spends). The Upgrade Station deducts via
+    /// ECheats, so enhancements/legendaries still go through. May make items free rather than blocked — verify.</summary>
+    public override HookResult OnModifyCurrency(ModifyCurrencyEvent args)
+    {
+        if (Config.BlockNativePurchases
+            && args.Source == ECurrencySource.EItemPurchase
+            && args.CurrencyType == ECurrencyType.EGold
+            && args.Amount < 0)
+            return HookResult.Stop;
         return HookResult.Continue;
     }
 
@@ -164,10 +180,16 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         _loot.OnEntitySpawned(args);
     }
 
-    /// <summary>`!upgrade <item>` until the Upgrade-Station zone UX lands (P2).</summary>
-    [Command("upgrade", Description = "Enhance a held item at 2× its price (Upgrade Station)")]
-    public void CmdUpgrade(CCitadelPlayerController caller, string itemName)
+    /// <summary>Upgrade Station — command-driven until the client station UI lands (P4).</summary>
+    [Command("br_enhance", Description = "Enhance a held item at 2× its tier price (Upgrade Station)")]
+    public void CmdEnhance(CCitadelPlayerController caller, string itemName)
     {
-        _upgrades.HandleUpgradeCommand(caller, itemName);
+        _upgrades.HandleEnhanceCommand(caller, itemName);
+    }
+
+    [Command("br_buylegendary", Description = "Buy a legendary (T5) item for a flat price (Upgrade Station)")]
+    public void CmdBuyLegendary(CCitadelPlayerController caller, string itemName)
+    {
+        _upgrades.HandleBuyLegendaryCommand(caller, itemName);
     }
 }

@@ -3,10 +3,12 @@ using DeadworksManaged.Api;
 namespace BossRush;
 
 /// <summary>
-/// DESIGN.md #5 — the shop becomes an Upgrade Station. There is no shop-catalog API, so this is a
-/// *station interaction*: enhance an item you already hold to its (temporary) enhanced version for
-/// <see cref="BossRushConfig.UpgradeCostMultiplier"/>× its normal price. Driven by an
-/// <c>!upgrade &lt;item&gt;</c> command for now; a proximity zone + HUD prompt comes in P2.
+/// DESIGN.md #5 — the shop is replaced by an Upgrade Station. Buying base items outright is gone (power comes
+/// from world loot); the store only offers two things, both priced off the item's tier:
+///   • Enhance a held item → <see cref="BossRushConfig.UpgradeCostMultiplier"/>× its tier price (temporary).
+///   • Buy a legendary (top-tier) item → flat <see cref="BossRushConfig.LegendaryPrice"/>.
+/// Driven by <c>!enhance</c>/<c>!buylegendary</c> commands for now; the storefront→station presentation (tabs,
+/// proximity zone) is a client VPK mod (P4). Tier/price come from <see cref="ItemCatalog"/> + config.
 /// </summary>
 public sealed class UpgradeStation
 {
@@ -19,36 +21,75 @@ public sealed class UpgradeStation
         _enhancements = enhancements;
     }
 
-    /// <summary>Entering a station trigger zone (P2). For now, upgrades go through the command.</summary>
+    /// <summary>Entering a station trigger zone (P4). For now, the station is driven by commands.</summary>
     public void OnEntityTouch(EntityTouchEvent e)
     {
-        // TODO(P2): detect a station zone; prompt the toucher with their upgradeable items.
+        // TODO(P4): detect a station zone; the client mod surfaces the tabs + prices.
     }
 
-    public void HandleUpgradeCommand(CCitadelPlayerController caller, string itemName)
+    private int TierPrice(int tier) =>
+        tier >= 1 && tier < _cfg.ItemTierPrices.Length ? _cfg.ItemTierPrices[tier] : 0;
+
+    private static bool Holds(CCitadelPlayerPawn pawn, string itemName) =>
+        pawn.AbilityComponent.FindAbilityByName(itemName) != null;
+
+    // ── Enhance a held item (2× its tier price) ─────────────────────────────────────
+
+    public void HandleEnhanceCommand(CCitadelPlayerController caller, string itemName)
     {
         var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
         if (pawn == null) return;
-
-        if (TryUpgrade(pawn, itemName))
-            Chat.PrintToChat(caller, $"[Boss Rush] Enhanced {itemName} for {_cfg.EnhancementDurationSeconds:F0}s.");
-        else
-            Chat.PrintToChat(caller, $"[Boss Rush] Can't enhance {itemName} (not held or not enough souls).");
+        TryEnhance(pawn, itemName, out var msg);
+        Chat.PrintToChat(caller, msg);
     }
 
-    /// <summary>Charge 2× the item's price (souls = EGold), then grant a temporary enhanced version.</summary>
-    public bool TryUpgrade(CCitadelPlayerPawn pawn, string itemName)
+    /// <summary>Charge 2× the item's tier price (souls), then grant its temporary enhanced version. Requires holding
+    /// the base item.</summary>
+    public bool TryEnhance(CCitadelPlayerPawn pawn, string itemName, out string message)
     {
-        var cost = (int)MathF.Round(ShopPriceOf(itemName) * _cfg.UpgradeCostMultiplier);
+        int tier = ItemCatalog.TierOf(itemName);
+        if (tier <= 0) { message = $"[Boss Rush] unknown item '{itemName}'."; return false; }
+        if (!Holds(pawn, itemName)) { message = $"[Boss Rush] you must hold {Pretty(itemName)} to enhance it."; return false; }
 
-        if (pawn.GetCurrency(ECurrencyType.EGold) < cost) return false;
-        // TODO(P0/P2): confirm holding `itemName` before charging (avoid enhancing nothing).
-        pawn.ModifyCurrency(ECurrencyType.EGold, -cost, ECurrencySource.EItemPurchase, spendOnly: true);
+        int cost = (int)MathF.Round(TierPrice(tier) * _cfg.UpgradeCostMultiplier);
+        if (pawn.GetCurrency(ECurrencyType.EGold) < cost) { message = $"[Boss Rush] need {cost} souls to enhance {Pretty(itemName)}."; return false; }
 
+        // ECheats source so a future BlockNativePurchases (which targets EItemPurchase) won't catch the station.
+        pawn.ModifyCurrency(ECurrencyType.EGold, -cost, ECurrencySource.ECheats, spendOnly: true);
         _enhancements.GrantTemporaryEnhanced(pawn, itemName);
+        message = _cfg.EnhancementPermanent
+            ? $"[Boss Rush] Enhanced {Pretty(itemName)} (T{tier}) for {cost}."
+            : $"[Boss Rush] Enhanced {Pretty(itemName)} (T{tier}) for {cost} — lasts {_cfg.EnhancementDurationSeconds:F0}s.";
         return true;
     }
 
-    // TODO(P2): source the real per-item price from item VData. Hard-coded fallback for now.
-    private static int ShopPriceOf(string itemName) => 500;
+    // ── Buy a legendary (top-tier) item (flat price) ────────────────────────────────
+
+    public void HandleBuyLegendaryCommand(CCitadelPlayerController caller, string itemName)
+    {
+        var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
+        if (pawn == null) return;
+        TryBuyLegendary(pawn, itemName, out var msg);
+        Chat.PrintToChat(caller, msg);
+    }
+
+    /// <summary>Buy a legendary (tier <see cref="BossRushConfig.LegendaryTier"/>) item for the flat legendary price.</summary>
+    public bool TryBuyLegendary(CCitadelPlayerPawn pawn, string itemName, out string message)
+    {
+        int tier = ItemCatalog.TierOf(itemName);
+        if (tier != _cfg.LegendaryTier) { message = $"[Boss Rush] {Pretty(itemName)} isn't a legendary (T{_cfg.LegendaryTier})."; return false; }
+        if (Holds(pawn, itemName)) { message = $"[Boss Rush] you already hold {Pretty(itemName)}."; return false; }
+        if (pawn.GetCurrency(ECurrencyType.EGold) < _cfg.LegendaryPrice) { message = $"[Boss Rush] need {_cfg.LegendaryPrice} souls for {Pretty(itemName)}."; return false; }
+
+        pawn.ModifyCurrency(ECurrencyType.EGold, -_cfg.LegendaryPrice, ECurrencySource.ECheats, spendOnly: true);
+        pawn.AddItem(itemName);
+        message = $"[Boss Rush] Purchased legendary {Pretty(itemName)} for {_cfg.LegendaryPrice}.";
+        return true;
+    }
+
+    private static string Pretty(string itemName)
+    {
+        var s = itemName.StartsWith("upgrade_", StringComparison.OrdinalIgnoreCase) ? itemName["upgrade_".Length..] : itemName;
+        return s.Replace('_', ' ');
+    }
 }

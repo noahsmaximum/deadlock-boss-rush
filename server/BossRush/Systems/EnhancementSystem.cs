@@ -29,6 +29,8 @@ public sealed class EnhancementSystem
         pawn.RemoveItem(itemName);            // drop the base variant if held (no-op otherwise)
         pawn.AddItem(itemName, enhanced: true);
 
+        if (_cfg.EnhancementPermanent) return; // no revert timer — permanent (survives time + death, untracked)
+
         if (!_active.TryGet(pawn, out var byItem))
             _active[pawn] = byItem = new Dictionary<string, IHandle>();
         if (byItem.TryGetValue(itemName, out var existing))
