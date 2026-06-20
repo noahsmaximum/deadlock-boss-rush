@@ -48,7 +48,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
             : "[Boss Rush] loaded. Loot the lanes. Kill the Patron.");
-        Console.WriteLine("[Boss Rush] dev commands (in-game prefix dw_): br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave, br_heal, br_additem, br_bossinfo, br_bossult, br_bossinput, br_bossfire, br_bosspromote, br_mod");
+        Console.WriteLine("[Boss Rush] dev commands (in-game prefix dw_): br_dumpents, br_nearby, br_pos, br_gamestate, br_spawn, br_cmds, br_run, br_ragewave, br_heal, br_additem, br_bossinfo, br_bossult, br_bossinput, br_bossfire, br_bosspromote, br_mod, br_sound, br_reloadcfg");
     }
 
     public override void OnUnload()
@@ -107,6 +107,8 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     public override void OnPrecacheResources()
     {
         Precache.AddResource(Config.PatronLaserParticle);
+        // NOTE: Precache.AddHero(Heroes.Familiar) does NOT register modifier_familiar_asleep's VData
+        // (tested live) — the boss's real sleep needs that modifier shipped in a server-loaded VPK (P4).
         // TODO(P3/P4): precache rage-wave / station particles + custom sounds shipped in client addon.
     }
 

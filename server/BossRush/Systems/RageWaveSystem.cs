@@ -42,8 +42,14 @@ public sealed class RageWaveSystem
         RageActive = false;
     }
 
-    /// <summary>Fire a rage wave immediately (dev/testing via <c>dw_br_ragewave</c>).</summary>
-    public void TriggerNow() => TriggerWave();
+    /// <summary>Fire a rage wave immediately (dev/testing via <c>dw_br_ragewave</c>) — bypasses the active-surge guard.</summary>
+    public void TriggerNow()
+    {
+        RageActive = false;            // dev: force a fresh trigger even if a surge is still active
+        _surgeBurst?.Cancel();
+        _surgeEnd?.Cancel();
+        TriggerWave();
+    }
 
     private void TriggerWave()
     {
@@ -88,8 +94,8 @@ public sealed class RageWaveSystem
 
     private void PlayRageSoundForEveryone()
     {
-        foreach (var pawn in Players.GetAllPawns())
-            pawn.EmitSound(_cfg.RageWaveStartSound);
+        // Stock announcer events are 2D/global — emit once (per-player would overlap with multiple heroes).
+        Players.GetAllPawns().FirstOrDefault(p => p.Health > 0)?.EmitSound(_cfg.RageWaveStartSound);
     }
 
     private static void Announce(string title, string desc) =>

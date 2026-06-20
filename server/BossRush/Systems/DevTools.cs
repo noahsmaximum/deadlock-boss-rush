@@ -337,4 +337,28 @@ public sealed partial class BossRushPlugin
         Console.WriteLine(msg);
         Chat.PrintToChat(caller, msg);
     }
+
+    [Command("br_sound", Description = "EmitSound a soundevent by name to test which fire (dev). e.g. br_sound MidBoss.Arrival [all]")]
+    public void CmdSound(CCitadelPlayerController caller, string soundName, string scope = "self")
+    {
+        var pawns = scope.Equals("all", StringComparison.OrdinalIgnoreCase)
+            ? Players.GetAllPawns().Where(p => p.Health > 0).ToList()
+            : new List<CCitadelPlayerPawn>();
+        if (pawns.Count == 0 && caller.GetHeroPawn()?.As<CCitadelPlayerPawn>() is { } self)
+            pawns.Add(self);
+
+        foreach (var p in pawns) p.EmitSound(soundName);
+        var msg = $"[Boss Rush] EmitSound('{soundName}') on {pawns.Count} pawn(s) — listen.";
+        Console.WriteLine(msg);
+        Chat.PrintToChat(caller, msg);
+    }
+
+    [Command("br_reloadcfg", Description = "Reload BossRushPlugin.jsonc and report key values (dev)")]
+    public void CmdReloadCfg(CCitadelPlayerController? caller = null)
+    {
+        bool ok = this.ReloadConfig();
+        var msg = $"[Boss Rush] config reload={ok} RageWaveStartSound='{Config.RageWaveStartSound}' native={Config.BossUseNativeAbilities}";
+        Console.WriteLine(msg);
+        if (caller != null) Chat.PrintToChat(caller, msg);
+    }
 }
