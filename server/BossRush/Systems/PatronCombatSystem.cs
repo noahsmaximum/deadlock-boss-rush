@@ -246,7 +246,8 @@ public sealed class PatronCombatSystem
 
     private void CastNextUlt(CBaseEntity patron)
     {
-        var def = Rotation[_ultCursor % Rotation.Length];
+        var active = _phase2Triggered ? Phase2Rotation : Phase1Rotation;
+        var def = active[_ultCursor % active.Length];
         _ultCursor++;
         Cast(patron, def);
     }
@@ -625,8 +626,8 @@ public sealed class PatronCombatSystem
     {
         var p = FindPatron();
         if (p == null) return false;
-        int n = Rotation.Length;
-        Cast(p, Rotation[((index % n) + n) % n]);
+        int n = Phase2Rotation.Length;
+        Cast(p, Phase2Rotation[((index % n) + n) % n]);
         return true;
     }
 
