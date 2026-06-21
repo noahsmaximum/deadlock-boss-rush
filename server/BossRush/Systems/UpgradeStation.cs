@@ -54,7 +54,7 @@ public sealed class UpgradeStation
         int cost = (int)MathF.Round(TierPrice(tier) * _cfg.UpgradeCostMultiplier);
         if (pawn.GetCurrency(ECurrencyType.EGold) < cost) { message = $"[Boss Rush] need {cost} souls to enhance {Pretty(itemName)}."; return false; }
 
-        // ECheats source so a future BlockNativePurchases (which targets EItemPurchase) won't catch the station.
+        // Spend via ECheats (not EItemPurchase) so station spends read distinctly from native buys in the currency hook.
         pawn.ModifyCurrency(ECurrencyType.EGold, -cost, ECurrencySource.ECheats, spendOnly: true);
         _enhancements.GrantTemporaryEnhanced(pawn, itemName);
         message = _cfg.EnhancementPermanent
