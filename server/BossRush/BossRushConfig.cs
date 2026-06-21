@@ -188,10 +188,8 @@ public sealed class BossRushConfig
     public int LegendaryPrice { get; set; } = 25000;
     /// <summary>Which tier counts as "legendary" — buyable at the store; everything below is loot-only.</summary>
     public int LegendaryTier { get; set; } = 5;
-    /// <summary>EXPERIMENTAL: block native shop purchases server-side. OFF by default — the currency hook has no item
-    /// context, so this blocks ALL native item buys (legendaries/enhances then go through the station commands). It
-    /// may make items free rather than blocked — verify in-game. The real storefront→station UI is a client mod.</summary>
-    public bool BlockNativePurchases { get; set; } = false;
+    // NOTE: a server-side BlockNativePurchases flag was removed — OnModifyCurrency.Stop can't veto a purchase
+    // (verified in-game). Buy-gating lives in the client shop UI instead (hide un-owned items).
     /// <summary>Chance (0–1) that a world drop rolls an *enhanced* item instead of a base one. Keep tiny.</summary>
     public float EnhancedDropChance { get; set; } = 0.01f;
     /// <summary>Enhancements are permanent (no timer, survive death). Flip off to use the timed behavior below.</summary>

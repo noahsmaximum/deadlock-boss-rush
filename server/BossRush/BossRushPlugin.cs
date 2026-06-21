@@ -120,18 +120,11 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         return HookResult.Continue;
     }
 
-    /// <summary>EXPERIMENTAL: buying base items outright is gone. The currency hook carries no item identity, so
-    /// when enabled this blocks ALL native item purchases (EItemPurchase spends). The Upgrade Station deducts via
-    /// ECheats, so enhancements/legendaries still go through. May make items free rather than blocked — verify.</summary>
-    public override HookResult OnModifyCurrency(ModifyCurrencyEvent args)
-    {
-        if (Config.BlockNativePurchases
-            && args.Source == ECurrencySource.EItemPurchase
-            && args.CurrencyType == ECurrencyType.EGold
-            && args.Amount < 0)
-            return HookResult.Stop;
-        return HookResult.Continue;
-    }
+    // NOTE (verified in-game 2026-06-20): blocking native item buys via OnModifyCurrency returning Stop on
+    // EItemPurchase spends does NOT work — the hook fires, but souls are still spent and the item is still granted.
+    // The currency hook is observe-only for purchases; there is no server veto here. Buy-gating is therefore done
+    // CLIENT-side in the shop UI (hide un-owned items so there's no buy option; owned items show Enhance; the
+    // legendary tab lists buyable legendaries). See the client addon's citadel_hud_hero_shop reskin.
 
     public override void OnPrecacheResources()
     {

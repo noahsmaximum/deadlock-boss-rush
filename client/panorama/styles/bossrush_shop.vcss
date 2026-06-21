@@ -1,0 +1,323 @@
+/* ════════════════════════════════════════════════════════════════════════════════════════
+   Boss Rush — Upgrade Station shop reskin (STATIC SHELL, pass 2).
+   Hides native shop; overlays a custom "arcane altar" modal. Native C++ lists stay in-tree
+   (collapsed) for later JS data reads. Enhanced theming uses the game's real cyan (#3FDCFF) +
+   enhanced_arrow asset. Fonts still default (Deadlock font mapping is a later pass).
+   ════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* Hide the native shop UI but keep it LIVE (opacity 0, not collapse) so its C++ item lists stay
+   populated/data-bound — bossrush_probe.js reads owned items out of them to build our tiles.
+   Our full-screen .BRStation overlay sits on top, so the invisible native shop catches no clicks. */
+#Shop { opacity: 0.0; }
+
+/* Full-screen overlay: dims the scene + centers the header+modal stack. */
+.BRStation { width: 100%; height: 100%; background-color: #0a071280; }
+.BRCenter { flow-children: down; horizontal-align: center; vertical-align: center; }
+
+/* ── Header (OUTSIDE the modal frame, larger, with flair) ── */
+.BRHeader { flow-children: down; width: 100%; margin-bottom: 14px; }
+.BRTitle
+{
+	font-size: 46px;
+	font-weight: bold;
+	color: #FFD24A;
+	letter-spacing: 6px;
+	text-transform: uppercase;
+	horizontal-align: center;
+	text-shadow: 0px 0px 22px 3.0 #ffb83a88, 0px 3px 6px 2.0 #000000ee;
+}
+.BRSubtitle
+{
+	font-size: 14px;
+	font-style: italic;
+	color: #c9bfe0;
+	horizontal-align: center;
+	text-align: center;
+	margin-top: 4px;
+}
+
+/* ── The modal frame ── */
+.BRModal
+{
+	width: 932px;
+	height: 414px;
+	horizontal-align: center;
+	flow-children: down;
+	padding: 18px;
+	background-color: #0e0b16;
+	background-image: url("s2r://panorama/images/shop/catalog/catalog_shop_category_weapon_bg_psd.vtex");
+	background-size: 100% auto;
+	background-position: 50% 50%;
+	background-repeat: no-repeat;
+	border: 2px solid #6e5417;
+	border-radius: 10px;
+	box-shadow: 0px 0px 40px 6px #00000099;
+}
+
+/* ── Tab bar ── */
+.BRTabBar { flow-children: right; width: 100%; height: 30px; margin-bottom: 12px; }
+.BRTab
+{
+	width: fit-children;
+	height: 28px;
+	margin-right: 6px;
+	padding: 0px 14px;
+	background-color: #211e28;
+	border: 1px solid #3a3f4a;
+	border-radius: 4px;
+}
+.BRTabLabel { font-size: 12px; font-weight: bold; color: #97a0b0; horizontal-align: center; vertical-align: center; text-align: center; }
+.BRTab:hover { border: 1px solid #8a90a0; }
+.BRTabActive { background-color: #34230f; border: 1px solid #FFD24A; }
+.BRTabActive .BRTabLabel { color: #FFD24A; }
+.BRTabWeapon.BRTabActive { border: 1px solid #e0954a; }
+.BRTabWeapon.BRTabActive .BRTabLabel { color: #e0954a; }
+
+.BRSouls
+{
+	width: fit-children;
+	height: 28px;
+	horizontal-align: right;
+	padding: 0px 14px;
+	font-size: 18px;
+	font-weight: bold;
+	color: #38E0C8;
+	text-align: center;
+	background-color: #0e2a26;
+	border: 1px solid #38E0C8;
+	border-radius: 4px;
+}
+
+/* ── Body: left grid + right detail ── */
+.BRBody { flow-children: right; width: 100%; height: 310px; overflow: noclip; }
+
+.BRLeft { flow-children: down; width: 524px; height: 100%; margin-right: 12px; overflow: noclip; }
+.BRGridHeader { flow-children: right; width: 100%; height: 18px; margin-bottom: 8px; }
+.BRGridTitle { font-size: 12px; color: #3a2a14; font-weight: bold; letter-spacing: 1px; vertical-align: center; }
+.BRHeld { font-size: 12px; color: #5a4422; font-weight: bold; letter-spacing: 1px; horizontal-align: right; vertical-align: center; }
+/* legendary's dark bg wants the light grey instead */
+.catLegendary .BRGridTitle { color: #aeb6c6; }
+.catLegendary .BRHeld { color: #8a93a6; }
+
+/* noclip on the horizontal axis + a little padding so hover scale/rotate isn't clipped by the
+   scroll viewport; vertical still scrolls for 9+ items. */
+.BRGrid { flow-children: down; width: 100%; height: 284px; padding: 8px 5px; overflow: noclip scroll; }
+.BRRow { flow-children: right; width: 100%; margin-bottom: 10px; overflow: noclip; }
+
+/* Tile = square; icon FILLS it; name is a bottom overlay; tier badge floats top-right.
+   No flow-children so children stack/overlap by align. */
+.BRTile
+{
+	width: 118px;
+	height: 118px;
+	margin-right: 9px;
+	border: 2px solid #6b4f30;
+	border-radius: 6px;
+	transition: transform 0.12s ease-out;
+}
+.BRTile:hover { border: 2px solid #FFD24A; pre-transform-scale2d: 1.06; transform: rotateZ( -3deg ); }
+.BRTileSelected { border: 2px solid #FFD24A; }
+/* selection = brighter title bar, not an outer glow */
+.BRTileSelected .BRTileNameBar { background-color: #ffffff; }
+
+.BRTileIcon
+{
+	width: 100%;
+	height: 100%;
+	border-radius: 4px;
+	background-color: gradient( linear, 0% 0%, 0% 100%, from( #e0954a ), to( #b06a2c ) );
+}
+.BRTierBadge
+{
+	horizontal-align: right;
+	vertical-align: top;
+	margin: 5px;
+	padding: 1px 5px;
+	font-size: 11px;
+	font-weight: bold;
+	color: #ffffff;
+	background-color: #2f6b2a;
+	border-radius: 3px;
+}
+.BRTileNameBar
+{
+	width: 100%;
+	height: 26px;
+	vertical-align: bottom;
+	background-color: #f0e2c6;
+	border-radius: 0px 0px 4px 4px;
+}
+.BRTileName
+{
+	font-size: 12px;
+	font-weight: bold;
+	color: #2a1c0c;
+	horizontal-align: center;
+	vertical-align: center;
+}
+
+/* enhanced tile flair (game cyan + the real enhanced arrow asset) */
+.BRTileEnhanced { border: 2px solid #3FDCFF; box-shadow: 0px 0px 14px 2px #3fdcff66; }
+.BREnhancedArrow
+{
+	width: 22px;
+	height: 22px;
+	horizontal-align: left;
+	vertical-align: top;
+	margin: 4px;
+	background-image: url("s2r://panorama/images/shop/enhanced_arrow_png.vtex");
+	background-size: contain;
+	background-repeat: no-repeat;
+	wash-color: #3FDCFF;
+}
+
+/* ── Detail side panel ── */
+.BRDetail
+{
+	width: 360px;
+	height: 100%;
+	flow-children: down;
+	padding: 12px;
+	background-color: gradient( linear, 0% 0%, 0% 100%, from( #9fe9f2 ), to( #d9a45f ) );
+	border: 2px solid #6b4f30;
+	border-radius: 8px;
+}
+.BRDetailHead { flow-children: right; width: 100%; }
+.BRDetailName { font-size: 16px; font-weight: bold; color: #2e1a0a; letter-spacing: 1px; vertical-align: center; }
+.BRDetailTier { font-size: 11px; font-weight: bold; color: #7b5b33; horizontal-align: right; vertical-align: center; }
+.BRDetailMetaRow { flow-children: right; width: 100%; margin-top: 3px; }
+.BRDetailPrice { font-size: 14px; font-weight: bold; color: #34230f; vertical-align: center; }
+.BRDetailCat
+{
+	horizontal-align: right;
+	padding: 2px 8px;
+	font-size: 10px;
+	font-weight: bold;
+	color: #ffffff;
+	background-color: #c47e38;
+	border-radius: 3px;
+}
+.BRDetailIcon
+{
+	width: 84px;
+	height: 84px;
+	horizontal-align: center;
+	margin-top: 10px;
+	margin-bottom: 8px;
+	border-radius: 4px;
+	background-color: gradient( linear, 0% 0%, 0% 100%, from( #e0c49a ), to( #cda263 ) );
+	border: 2px solid #6b4f3088;
+}
+.BRDetailDesc { font-size: 12px; color: #4a3418; text-align: center; width: 100%; margin-bottom: 10px; }
+
+.BRStatRow { flow-children: right; width: 100%; margin-bottom: 10px; }
+.BRStat
+{
+	width: 84px;
+	flow-children: down;
+	padding: 6px;
+	margin-right: 6px;
+	background-color: #d9a45f;
+	border: 1px solid #b9913a;
+	border-radius: 4px;
+}
+.BRStatVal { font-size: 15px; font-weight: bold; color: #2e1a0a; horizontal-align: center; }
+.BRStatLbl { font-size: 9px; color: #7b5b33; letter-spacing: 1px; horizontal-align: center; }
+
+.BRActionBtn
+{
+	flow-children: right;
+	width: 100%;
+	height: 42px;
+	vertical-align: bottom;
+	background-color: gradient( linear, 0% 0%, 0% 100%, from( #3FDCFF ), to( #0E8FAC ) );
+	border: 1px solid #94F4FF;
+	border-radius: 6px;
+}
+.BRActionBtn:hover { box-shadow: 0px 0px 16px 3px #3fdcffaa; }
+.BRActionInner { flow-children: right; width: fit-children; horizontal-align: center; vertical-align: center; }
+.BRActionArrow
+{
+	width: 18px;
+	height: 18px;
+	vertical-align: center;
+	margin-right: 6px;
+	background-image: url("s2r://panorama/images/shop/enhanced_arrow_png.vtex");
+	background-size: contain;
+	background-repeat: no-repeat;
+	wash-color: #04222a;
+}
+.BRActionLbl { font-size: 16px; font-weight: bold; color: #04222a; letter-spacing: 2px; vertical-align: center; }
+
+/* ── Footer ── */
+.BRFooter { font-size: 11px; color: #6e5417; horizontal-align: center; margin-top: 10px; }
+
+/* ════ Category theming ════════════════════════════════════════════════════════════════
+   JS toggles cat{Weapon,Armor,Tech,Legendary} on the modal as tabs are clicked; the UI recolors.
+   Weapon/orange is the base look, so catWeapon needs no overrides. Active-tab color follows the
+   category too. (Vitality=green, Spirit=purple, Legendary=mythic violet.) */
+
+/* ── tiles ── */
+.catArmor .BRTileIcon { background-color: gradient( linear, 0% 0%, 0% 100%, from( #6FBF5B ), to( #3f8a35 ) ); }
+.catTech  .BRTileIcon { background-color: gradient( linear, 0% 0%, 0% 100%, from( #B06FE8 ), to( #7e44b0 ) ); }
+.catLegendary .BRTileIcon { background-color: gradient( linear, 0% 0%, 0% 100%, from( #2a3344 ), to( #141a26 ) ); }
+.catLegendary .BRTile { border: 2px solid #38415a; }
+.catLegendary .BRTileNameBar { background-color: #0c1018ee; }
+
+/* ── active-tab accents ── */
+.BRTabArmor.BRTabActive { background-color: #16240f; border: 1px solid #6FBF5B; }
+.BRTabArmor.BRTabActive .BRTabLabel { color: #6FBF5B; }
+.BRTabTech.BRTabActive { background-color: #1d1430; border: 1px solid #B06FE8; }
+.BRTabTech.BRTabActive .BRTabLabel { color: #B06FE8; }
+.BRTabLegendary.BRTabActive { background-color: #1a2233; border: 1px solid #8fb0e0; }
+.BRTabLegendary.BRTabActive .BRTabLabel { color: #cdd9ee; }
+
+/* ── selection: non-legendary uses a border (the bright title bar is the real cue, set globally);
+      legendary keeps a chromatic-aberration glow (magenta/cyan offset). ── */
+.catArmor .BRTileSelected { border: 2px solid #8fe07b; }
+.catTech  .BRTileSelected { border: 2px solid #c79bf0; }
+.catLegendary .BRTileSelected { border: 2px solid #c8b8ff; }
+.catLegendary .BRTileName { color: #dce4f2; }
+/* legendary selection = chromatic title bar (cyan→magenta), no outer glow */
+.catLegendary .BRTileSelected .BRTileNameBar { background-color: gradient( linear, 0% 0%, 100% 0%, from( #2effe0 ), to( #ff2ec8 ) ); }
+.catLegendary .BRTileSelected .BRTileName { color: #0c1018; }
+
+/* ── right detail panel: bottom tint + accents per category (top keeps the enhanced cyan fade) ── */
+.catArmor .BRDetail { background-color: gradient( linear, 0% 0%, 0% 100%, from( #9fe9f2 ), to( #8fc47e ) ); }
+.catTech  .BRDetail { background-color: gradient( linear, 0% 0%, 0% 100%, from( #9fe9f2 ), to( #b58fd9 ) ); }
+.catArmor .BRDetailIcon { background-color: gradient( linear, 0% 0%, 0% 100%, from( #c6e4ba ), to( #8fc47e ) ); }
+.catTech  .BRDetailIcon { background-color: gradient( linear, 0% 0%, 0% 100%, from( #d8c4ec ), to( #b58fd9 ) ); }
+.catArmor .BRStat { background-color: #8fc47e; border: 1px solid #5a9e48; }
+.catTech  .BRStat { background-color: #b58fd9; border: 1px solid #8a5fb8; }
+.catArmor .BRDetailCat { background-color: #3f8a35; }
+.catTech  .BRDetailCat { background-color: #7e44b0; }
+
+/* ── Legendary / Mythic: dark slate panel + light text + grey BUY RELIC button (matches mockup) ── */
+.catLegendary .BRDetail { background-color: gradient( linear, 0% 0%, 0% 100%, from( #2b3447 ), to( #141a26 ) ); border: 2px solid #38415a; }
+.catLegendary .BRDetailName { color: #eaf0fa; }
+.catLegendary .BRDetailTier { color: #8a93a6; }
+.catLegendary .BRDetailPrice { color: #38E0C8; }
+.catLegendary .BRDetailDesc { color: #c2cad8; }
+.catLegendary .BRDetailCat { background-color: #38415a; color: #cdd6e6; }
+.catLegendary .BRDetailIcon { background-color: gradient( linear, 0% 0%, 0% 100%, from( #2e3a50 ), to( #1a2230 ) ); border: 2px solid #38415a; }
+.catLegendary .BRStat { background-color: #1c2433; border: 1px solid #38415a; }
+.catLegendary .BRStatVal { color: #eaf0fa; }
+.catLegendary .BRStatLbl { color: #8a93a6; }
+.catLegendary .BRActionBtn { background-color: gradient( linear, 0% 0%, 0% 100%, from( #cfd6e2 ), to( #9aa3b4 ) ); border: 1px solid #e6ecf5; }
+.catLegendary .BRActionLbl { color: #1a2230; }
+.catLegendary .BRActionArrow { visibility: collapse; }
+
+/* modal background swaps to the real per-category shop texture (cropped to fill) */
+.BRModal.catArmor { background-image: url("s2r://panorama/images/shop/catalog/catalog_shop_category_vitality_bg_psd.vtex"); }
+.BRModal.catTech  { background-image: url("s2r://panorama/images/shop/catalog/catalog_shop_category_spirit_bg_psd.vtex"); }
+/* Legendary uses NO texture — a dark mystical gradient instead (chromatic glow lives on the tiles). */
+.BRModal.catLegendary { background-image: none; background-color: gradient( linear, 0% 0%, 0% 100%, from( #241d3e ), to( #08060f ) ); }
+
+/* ════ Animations ══════════════════════════════════════════════════════════════════════
+   Open = backdrop fade + header/modal rise. Tab switch = JS rebuilds tiles, each pops in.
+   (Close + enhance animations come later — close needs a teardown hook, enhance needs the action.) */
+@keyframes 'BRFadeIn' { 0% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes 'BRPopIn'  { 0% { opacity: 0; transform: translate3d( 0px, 14px, 0px ); } 100% { opacity: 1; transform: translate3d( 0px, 0px, 0px ); } }
+.BRStation { animation-name: BRFadeIn; animation-duration: 0.18s; animation-timing-function: ease-out; }
+.BRHeader  { animation-name: BRPopIn;  animation-duration: 0.24s; animation-timing-function: ease-out; }
+.BRModal   { animation-name: BRPopIn;  animation-duration: 0.24s; animation-timing-function: ease-out; }
