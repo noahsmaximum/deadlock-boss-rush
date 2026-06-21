@@ -1,8 +1,46 @@
 # Deadlock BOSS RUSH — Project Handoff & State
 
-A self-contained brief to continue this project seamlessly in another chat. Covers the goal, the
-architecture, where everything lives, how to build/run, what works, what's stubbed, every gotcha we
-hit, and what's next.
+> **⚠️ Sections 1–12 below are an EARLY snapshot (stale branch name + completed TODOs). Read the
+> CURRENT STATE block first; trust it over older sections where they conflict.**
+
+---
+
+## CURRENT STATE (2026-06-20) — branch `feat/p3-rem-sleep`
+
+Push: `git push origin feat/p3-rem-sleep`. **`main` moves under us via the user's PR merges — `git fetch`
+first; do NOT merge main into the branch unprompted** (a botched merge once half-broke the rotation).
+
+**DONE + verified in-game (server side — feature-complete):**
+- **Hidden King boss fight:** phase-aware ult rotation (Phase 1 Laser + Rocket Barrage; Phase 2 unlocks
+  Seven Storm Cloud + Bomb Blast), real shipped particles/sounds, stun (`modifier_citadel_knockdown`),
+  knockback (`AbsVelocity`), charge-up Bomb Blast, health-pool preserved across phase resets, tuned damage.
+  Heavy kit unlocks by **bars-lost** (`_heavyKitUnlocked`), not the health-wiping native phase-2 cvar.
+- **World loot:** breaking boxes → items. Detected via **OnEntitySpawned** of the drop pickups
+  (`citadel_breakable_prop_gold_pickup` / `_modifier_pickup`) — props fire neither damage nor touch hooks.
+  **Time-tiered rarity** (items bucketed by `m_iItemTier`; weights by match clock). Crates/breakables
+  front-loaded + fast respawn via `citadel_*` convars. `LootDropChance` 0.6.
+- **Store backend:** `dw_br_enhance <held>` (2× tier price), `dw_br_buylegendary <T5>` (flat 25000).
+  Permanent enhancements. (The shop *UI* is the next task.)
+- **Lane defenses:** Walker ×4 HP; guardian HP buffs. (Adding a 2nd guardian = map edit; raw spawn crashes.)
+
+**CLIENT MOD (CSDK 12) — pipeline PROVEN:** author source in `Reduced_CSDK_12\content\citadel_addons\
+pve-boss-rush\`, user compiles in Asset Browser (`csdkcfg.exe`) → packs VPK (`CSDKCfgVPK.exe`) → installs
+via DMM. Mirrored to repo `client/`.
+- **Data overrides load + recompile** (proven: generic_data price + `abilities.vdata` non-hero proc fix,
+  verified). Overriding `abilities.vdata`: **delete the `_include` block** first (decompiler inlines content).
+- **Proc lesson:** `CITADEL_UNIT_TARGET_ALL_ENEMY` ≈ enemy HEROES only; full enemy set =
+  `HERO_ENEMY|TROOPER_ENEMY|BOSS_ENEMY|BUILDING_ENEMY|PROP_ENEMY|MINION_ENEMY|NEUTRAL|CREEP_ENEMY`.
+  Proc/ability behavior is **server-authoritative** (DMM addon is client-side; use loose-file override
+  `citadel/scripts/X.vdata_c` for a separate dedicated server).
+- **Panorama:** overrides LOAD, but **decompiled panorama is LOSSY** (a recompiled layout broke the prompt).
+  Shop logic is **C++** (`CitadelShopMods*` panels; almost no JS; schema JSON doesn't cover UI panels).
+  Shop layouts: `citadel_hud_hero_shop` (container), `citadel_shop_mods_tier` (tier row), `citadel_shop_mod_view`
+  (item card w/ built-in Enhance), `citadel_shop_mods_build`. Banner likely an image.
+
+**NEXT: CUSTOM UPGRADE-STATION UI (client Panorama).** User chose to attempt custom layouts. Iterative
+compile→look→fix grind: reskin via `.vcss`, override layout shells per-file (testing each, lossy-aware),
+keep C++ panels, lean on native Enhance + `dw_br_*` commands. Other parked client-mod items: imbue picker,
+no-buy-T1-T4 enforcement, Rem sleep modifier (server VPK), boss HUD.
 
 ---
 
