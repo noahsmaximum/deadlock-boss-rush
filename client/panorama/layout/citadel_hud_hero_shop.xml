@@ -150,37 +150,14 @@
 						<Panel class="BRTab BRTabArmor"><Label class="BRTabLabel" text="MPS" /></Panel>
 						<Panel class="BRTab BRTabTech"><Label class="BRTabLabel" text="CURIOSITY CATALOG" /></Panel>
 						<Panel class="BRTab BRTabLegendary"><Label class="BRTabLabel" text="LEGENDARIES" /></Panel>
-						<Label class="BRSouls" text="◈ 2,248" />
 					</Panel>
 
-					<Panel class="BRBody">
-						<Panel class="BRLeft">
-							<Panel class="BRGridHeader">
-								<Label class="BRGridTitle" text="OWNED · FAIRWAY" />
-								<Label class="BRHeld" text="8 HELD" />
-							</Panel>
-							<!-- Tiles are built by bossrush_probe.js from the player's real owned items. -->
-							<Panel class="BRGrid" />
-						</Panel>
-
-						<Panel class="BRDetail">
-							<Panel class="BRDetailHead">
-								<Label class="BRDetailName" text="EMBER SIGIL" />
-								<Label class="BRDetailTier" text="TIER 2" />
-							</Panel>
-							<Panel class="BRDetailMetaRow">
-								<Label class="BRDetailPrice" text="◈ 6,400" />
-								<Label class="BRDetailCat" text="FAIRWAY" />
-							</Panel>
-							<Panel class="BRDetailIcon" />
-							<Label class="BRDetailDesc" text="Rounds ignite on impact, searing armor with the Archmother's flame." />
-							<Panel class="BRStatRow">
-								<Panel class="BRStat"><Label class="BRStatVal" text="+14%" /><Label class="BRStatLbl" text="BURN DMG" /></Panel>
-								<Panel class="BRStat"><Label class="BRStatVal" text="3.0s" /><Label class="BRStatLbl" text="SCORCH" /></Panel>
-							</Panel>
-							<Panel class="BRActionBtn"><Panel class="BRActionInner"><Panel class="BRActionArrow" /><Label class="BRActionLbl" text="ENHANCE" /></Panel></Panel>
-						</Panel>
+					<Panel class="BRGridHeader">
+						<Label class="BRGridTitle" text="OWNED · FAIRWAY" />
+						<Label class="BRHeld" text="8 HELD" />
 					</Panel>
+					<!-- Tiles are reparented native cards, built by bossrush_probe.js -->
+					<Panel class="BRGrid" />
 
 					<Label class="BRFooter" text="ESC / B — Close" />
 				</Panel>
