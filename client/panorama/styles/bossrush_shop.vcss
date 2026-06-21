@@ -40,7 +40,7 @@
 .BRModal
 {
 	width: 932px;
-	height: 414px;
+	height: 500px;
 	horizontal-align: center;
 	flow-children: down;
 	padding: 18px;
@@ -101,17 +101,17 @@
 
 /* noclip on the horizontal axis + a little padding so hover scale/rotate isn't clipped by the
    scroll viewport; vertical still scrolls for 9+ items. */
-.BRGrid { flow-children: down; width: 100%; height: 284px; padding: 8px 5px; overflow: noclip scroll; }
-.BRRow { flow-children: right; width: 100%; margin-bottom: 10px; overflow: noclip; }
+/* center the whole grid block (sizes to its widest row) instead of per-row centering */
+.BRGrid { flow-children: down; width: fit-children; height: 384px; horizontal-align: center; padding: 8px 0px; overflow: noclip scroll; }
+.BRRow { flow-children: right; width: fit-children; horizontal-align: center; margin-bottom: 12px; overflow: noclip; }
 
 /* Tile = square; icon FILLS it; name is a bottom overlay; tier badge floats top-right.
    No flow-children so children stack/overlap by align. */
 .BRTile
 {
-	width: 118px;
-	height: 118px;
-	margin-right: 9px;
-	border: 2px solid #6b4f30;
+	width: 134px;
+	height: 134px;
+	margin: 0px 6px;
 	border-radius: 6px;
 	transition: transform 0.12s ease-out;
 }
@@ -251,6 +251,26 @@
 
 /* ── Footer ── */
 .BRFooter { font-size: 11px; color: #6e5417; horizontal-align: center; margin-top: 10px; }
+
+/* our ENHANCE badge — layered over the native sell badge, shown on hover (hittest off, so the
+   native card still gets the hover for its tooltip). Covers the native "Sell". */
+.BREnhOverlay
+{
+	width: 124px;
+	height: 144px;
+	horizontal-align: center;
+	vertical-align: center;
+	flow-children: down;
+	padding: 10px;
+	background-color: #0b0b12f2;
+	border-radius: 10px;
+	box-shadow: 0px 0px 12px 2px #00000099;
+	visibility: collapse;
+}
+.BRTile:hover .BREnhOverlay { visibility: visible; }
+.BREnhWord  { font-size: 17px; font-weight: bold; color: #FFD24A; letter-spacing: 1px; horizontal-align: center; vertical-align: center; }
+.BREnhName  { font-size: 13px; font-weight: bold; color: #f0e6d2; horizontal-align: center; text-align: center; width: 100%; margin-top: 6px; }
+.BREnhPrice { font-size: 18px; font-weight: bold; color: #38E0C8; horizontal-align: center; vertical-align: center; margin-top: 8px; }
 
 /* ════ Category theming ════════════════════════════════════════════════════════════════
    JS toggles cat{Weapon,Armor,Tech,Legendary} on the modal as tabs are clicked; the UI recolors.
