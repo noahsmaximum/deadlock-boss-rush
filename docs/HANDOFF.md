@@ -5,6 +5,18 @@
 
 ---
 
+## CURRENT STATE — 2026-06-21 (custom shop UI, mid-build)
+
+Branch `feat/p3-rem-sleep`. Server (boss/loot/store/lanes) is feature-complete from earlier. Active work = the **custom client shop** ("Upgrade Station"). Full detail is in agent memory `reference_deadlock-shop-current-state.md` — summary:
+
+- **Architecture pivot:** we **reparent the real native shop cards** into our grid (`card.SetParent(tile)` — SetParent works in Panorama). Native shop hidden via `#Shop { opacity: 0.0; }` (kept live for data). Cards bring icon + native hover tooltip + hover FX for free. Files: `client/panorama/{layout/citadel_hud_hero_shop.xml, styles/bossrush_shop.vcss, scripts/bossrush_probe.js}` (mirrored from the CSDK content dir; build = user compiles in csdkcfg GUI → VPK → DMM). Rename `bossrush_probe.js` someday.
+- **Icons: SOLVED** (reparented native icons → all correct/live).
+- **Layout:** header outside modal; JS-wired recoloring tabs; centered full-width grid of native cards (6/row) with a name-bar overlay; no custom detail panel.
+- **Sell→ENHANCE: the answer is found, not yet built.** The native sell badge re-renders continuously on hover (can't relabel/cover/override without killing the tooltip). The native game has an enhance mode: `PopupPickEnhanceItem .owned:hover #EnhanceOverlay { visible }` + `#SellOverlay { collapse }` (native blue `#EnhanceOverlay`). NEXT: try our vcss `.owned:hover #SellOverlay{collapse}` + `.owned:hover #EnhanceOverlay{visible}` over the reparented cards. Remove the dead `addEnhanceBadge`/`.BREnhOverlay` cover attempt.
+- **Still open:** manilla tabs restyle; OWNED→ENHANCED state (`.isEnhanced`); the **enhance ACTION** (client→server still unsolved — clicking a card natively SELLS, so don't wire visuals to a working enhance until the channel exists); legendary BUY flow (`.IgnoreOwnership`); fonts; hide native HUD bits.
+
+---
+
 ## CURRENT STATE (2026-06-20) — branch `feat/p3-rem-sleep`
 
 Push: `git push origin feat/p3-rem-sleep`. **`main` moves under us via the user's PR merges — `git fetch`
