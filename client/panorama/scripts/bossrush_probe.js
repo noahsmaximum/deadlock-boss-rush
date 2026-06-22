@@ -17,6 +17,53 @@
         if (ch) for (var i = 0; i < ch.length; i++) collect(ch[i], type, out, depth + 1);
     }
 
+    // Sell → ENHANCE on the hover-tooltip card preview. The native rule
+    // `#CitadelModHoverTooltip.owned #SellOverlay { visibility: visible }` shows "Sell" on the
+    // tooltip's #ModView clone; our vcss override didn't win, so we flip it in JS instead —
+    // inline visibility beats the stylesheet and is deterministic. Only the tooltip preview is
+    // touched (the real grid card flip is handled by .BRTile CSS). Cheap: one traverse, gated to
+    // when the shop is open.
+    function flipHoverTooltip(top) {
+        var tt = top.FindChildTraverse("CitadelModHoverTooltip");
+        if (!tt) return;
+        var owned = false; try { owned = tt.BHasClass("owned"); } catch (e) {}
+        if (!owned) return;
+        var so = null, eo = null;
+        try { so = tt.FindChildTraverse("SellOverlay"); } catch (e) {}
+        try { eo = tt.FindChildTraverse("EnhanceOverlay"); } catch (e) {}
+        try { if (so) so.visible = false; } catch (e) {}
+        try { if (eo) eo.visible = true; } catch (e) {}
+        if (!eo) return;
+
+        // Native #EnhanceOverlay shows "Enhance" + name only — inject the 2× cost, styled to match the
+        // native sell price (souls icon + ~16px bold number, centered). The tooltip is a fresh panel each
+        // hover, so our row vanishes with it; re-add when missing (id guards dupes).
+        var has = null; try { has = eo.FindChildTraverse("BREnhPrice"); } catch (e) {}
+        if (has) return;
+        var base = 0, ic = null;
+        try { ic = tt.FindChildTraverse("ItemCost"); } catch (e) {}
+        if (ic) { try { base = parseCost(ic.text); } catch (e) {} }
+        var price = base ? base * 2 : 0;
+        if (!price) return;   // no cost read → skip the row rather than show a bare word
+        var mc = eo;
+        try { var arr = eo.FindChildrenWithClassTraverse("MessageContent"); if (arr && arr.length) mc = arr[0]; } catch (e) {}
+        var row = $.CreatePanel("Panel", mc, "BREnhPrice");
+        try { row.style.flowChildren = "right"; row.style.horizontalAlign = "center"; row.style.marginTop = "6px"; } catch (e) {}
+        // reuse the real native souls icon from the (hidden) sell overlay for an exact match
+        if (so) {
+            var gi = null; try { gi = so.FindChildrenWithClassTraverse("goldIcon"); } catch (e) {}
+            if (gi && gi.length) {
+                try { gi[0].SetParent(row); gi[0].style.width = "18px"; gi[0].style.height = "18px"; gi[0].style.marginRight = "5px"; gi[0].style.verticalAlign = "middle"; gi[0].visible = true; } catch (e) {}
+            }
+        }
+        var amt = $.CreatePanel("Label", row, "");
+        amt.text = fmt(price);
+        try {
+            amt.style.fontSize = "17px"; amt.style.fontWeight = "bold"; amt.style.color = "#ffffff";
+            amt.style.verticalAlign = "middle"; amt.style.textShadow = "0px 0px 5px 2.0 #000000";
+        } catch (e) {}
+    }
+
     // ── Tabs ──
     var TAB_DEFS = [
         { cls: "BRTabWeapon",    cat: "catWeapon",    slot: "EItemSlotType_WeaponMod", list: "ShopModsListWeapon", dir: "weapon",   name: "FAIRWAY",           grid: "OWNED · FAIRWAY",             action: "ENHANCE" },
@@ -143,19 +190,6 @@
         } catch (e) {}
     }
 
-    // Our own ENHANCE badge, layered on top of the native sell badge (hittest off so the card still
-    // gets the hover for its tooltip). Shown via .BRTile:hover in CSS. Covers the native "Sell".
-    function addEnhanceBadge(tile, item) {
-        var legendary = (activeDef.cat === "catLegendary");
-        var word = legendary ? "BUY RELIC" : "ENHANCE";
-        var price = legendary ? 25000 : (item.cost ? item.cost * 2 : 0);
-        var ov = $.CreatePanel("Panel", tile, ""); ov.AddClass("BREnhOverlay");
-        try { ov.hittest = false; } catch (e) {}
-        var w = $.CreatePanel("Label", ov, ""); w.AddClass("BREnhWord"); w.text = word;
-        var nm = $.CreatePanel("Label", ov, ""); nm.AddClass("BREnhName"); nm.text = item.name;
-        var pr = $.CreatePanel("Label", ov, ""); pr.AddClass("BREnhPrice"); pr.text = "◈ " + fmt(price);
-    }
-
     function selectDetail(top, grid, item, tile) {
         if (grid) {
             var tiles = grid.FindChildrenWithClassTraverse("BRTile");
@@ -171,8 +205,13 @@
         else setText(top, "BRActionLbl", item.cost ? ("ENHANCE  ◈ " + fmt(item.cost * 2)) : "ENHANCE");
     }
 
+    var gridTick = 0, lastGridDbg = "";
     function populateGrid(top) {
-        if (activeDef.list === lastGridSig) return;   // category unchanged → keep tiles (cards stay hoverable)
+        gridTick++;
+        // Rebuild on tab change, otherwise periodically (~2.4s) so enhancing/selling refreshes the cards
+        // instead of lingering until a tab switch. (Can't cheaply detect the change without rebuilding,
+        // since borrowed cards leave the native list — so we throttle a periodic rebuild.)
+        if (activeDef.list === lastGridSig && (gridTick % 8 !== 0)) return;
         lastGridSig = activeDef.list;
 
         returnBorrowed();                              // cards back to the native list before reading it
@@ -188,23 +227,83 @@
             var tile = $.CreatePanel("Panel", row, "");
             tile.AddClass("BRTile");
             borrowCard(it.card, tile);   // reparent the real native card in (icon + native hover tooltip)
+
+            // Hide the native "OWNED" overlay (#ItemPurchased is the owned/sold-out badge in the card).
+            try { var ip = it.card.FindChildTraverse("ItemPurchased"); if (ip) ip.visible = false; } catch (e) {}
+            // NOTE: no client-side "enhanced" detection — `.isEnhanced` is unreliable here because the
+            // citadel_shop_items_appear_enhanced convar (if set) makes EVERY card report enhanced. Every owned
+            // item stays clickable; re-enhancing an already-enhanced item is guarded server-side instead.
+
             var bar = $.CreatePanel("Panel", tile, ""); bar.AddClass("BRTileNameBar");
             try { bar.hittest = false; } catch (e) {}   // don't steal hover from the card
             var nm = $.CreatePanel("Label", bar, ""); nm.AddClass("BRTileName"); nm.text = it.name;
-            addEnhanceBadge(tile, it);   // our ENHANCE badge, layered over the native sell badge
         });
 
         setText(top, "BRHeld", items.length + " HELD");
     }
 
+    // The native "Sell Item?" confirm (a popup_generic instance: #TitleLabel + #MessageLabel + OK/Cancel) only
+    // pops for USED items. We relabel it in place to "Enhance Item?" + the 2× price — its OK natively sends the
+    // "sellitem <name>" command, which the server intercepts and turns into an enhance, so we leave the button
+    // alone. Key off the live title text (C++ resets it to "Sell Item?" for each new sell), so this re-runs per
+    // appearance and never double-processes (after relabel the title no longer says "sell item").
+    // Find the first Label under `panel` whose (html-stripped) text contains `needle` (lowercase).
+    function findLabelByText(panel, needle, depth) {
+        if (!panel || depth > 18) return null;
+        var t = null; try { t = panel.text; } catch (e) {}
+        if (t && ("" + t).replace(/<[^>]*>/g, "").toLowerCase().indexOf(needle) >= 0) return panel;
+        var ch = null; try { ch = panel.Children(); } catch (e) {}
+        if (ch) for (var i = 0; i < ch.length; i++) { var r = findLabelByText(ch[i], needle, depth + 1); if (r) return r; }
+        return null;
+    }
+
+    function handleSellPopup(top) {
+        var title = top.FindChildTraverse("TitleLabel");
+        if (!title) return;
+        var ttxt = ""; try { ttxt = "" + (title.text || ""); } catch (e) { return; }
+        if (ttxt.toLowerCase().indexOf("sell item") < 0) return;
+
+        // Relabel the title FIRST so it always flips (and the "sell item" guard above stops re-processing).
+        try { title.text = "Enhance Item?"; } catch (e) {}
+
+        // The message label's id ("MessageLabel") isn't reliable here, so find it by content.
+        var msg = findLabelByText(top, "purchase price", 0) || findLabelByText(top, "want to sell", 0);
+        if (!msg) return;
+        var mtxt = ""; try { mtxt = ("" + (msg.text || "")).replace(/<[^>]*>/g, ""); } catch (e) {}   // strip html=true markup
+        var m = /sell item (.+?) for ([\d,]+)/i.exec(mtxt);
+        var newText;
+        if (m) {
+            var disp = m[1].trim();
+            var sell = parseInt(m[2].replace(/[^0-9]/g, ""), 10) || 0;  // sell = 0.5 × base → enhance = 2 × base = 4 × sell
+            newText = "Enhance " + disp + " for " + fmt(sell * 4) + " souls (2× the purchase price)?";
+        } else {
+            newText = "Enhance this item for 2× its purchase price?";
+        }
+        try { msg.text = newText; } catch (e) {}
+    }
+
+    var cTop = null, cModal = null, cStation = null;
     function apply() {
-        var top = topOf($.GetContextPanel());
-        var modal = top ? first(top, "BRModal") : null;
-        if (!top || !modal) { $.Schedule(0.5, apply); return; }
-        wireTabs(top, modal);
-        var L = top.FindChildTraverse(activeDef.list);
+        if (!cTop) cTop = topOf($.GetContextPanel());
+        if (!cTop) { $.Schedule(0.5, apply); return; }
+        if (!cModal)   cModal   = first(cTop, "BRModal");
+        if (!cStation) cStation = first(cTop, "BRStation");
+        if (!cModal || !cStation) { $.Schedule(0.5, apply); return; }
+
+        // Only do heavy work while the shop is actually on screen. This poll runs forever; when the
+        // shop is closed it must stay cheap, or it stalls the main thread every tick — which also
+        // drives usercmd send, so a stall there desyncs client prediction and hitches the game.
+        // BRStation collapses to 0 width when the shop is hidden → single-property open check.
+        var open = false;
+        try { open = cStation.actuallayoutwidth > 0; } catch (e) {}
+        if (!open) { $.Schedule(0.4, apply); return; }
+
+        wireTabs(cTop, cModal);
+        var L = cTop.FindChildTraverse(activeDef.list);
         if (L) { var nc = []; collect(L, "CitadelShopMod", nc, 0); if (nc.length === 0) $.DispatchEvent("CitadelShopModsActivate", activeDef.slot); }
-        populateGrid(top);
+        populateGrid(cTop);
+        flipHoverTooltip(cTop);
+        handleSellPopup(cTop);
         $.Schedule(0.3, apply);
     }
 

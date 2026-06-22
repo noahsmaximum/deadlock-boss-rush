@@ -1,19 +1,39 @@
 # Deadlock BOSS RUSH — Project Handoff & State
 
-> **⚠️ Sections 1–12 below are an EARLY snapshot (stale branch name + completed TODOs). Read the
-> CURRENT STATE block first; trust it over older sections where they conflict.**
+> **⚠️ Sections 1–12 + older CURRENT STATE blocks below are STALE snapshots. Read the
+> 2026-06-22 block first; trust it over everything older where they conflict.** Deep detail also lives
+> in agent memory `reference_deadlock-shop-current-state.md` + `reference_csdk-build-pipeline.md`.
 
 ---
 
-## CURRENT STATE — 2026-06-21 (custom shop UI, mid-build)
+## CURRENT STATE — 2026-06-22 ✅ UPGRADE STATION ENHANCE: WORKING END-TO-END
 
-Branch `feat/p3-rem-sleep`. Server (boss/loot/store/lanes) is feature-complete from earlier. Active work = the **custom client shop** ("Upgrade Station"). Full detail is in agent memory `reference_deadlock-shop-current-state.md` — summary:
+Branch `feat/p3-rem-sleep`. The custom **Upgrade Station** shop is functionally DONE: **click an owned item → it enhances** (charge 2× tier price, grant the enhanced variant), fully server-side, one click. The long-standing blocker ("how does a client shop click reach the server") is solved.
 
-- **Architecture pivot:** we **reparent the real native shop cards** into our grid (`card.SetParent(tile)` — SetParent works in Panorama). Native shop hidden via `#Shop { opacity: 0.0; }` (kept live for data). Cards bring icon + native hover tooltip + hover FX for free. Files: `client/panorama/{layout/citadel_hud_hero_shop.xml, styles/bossrush_shop.vcss, scripts/bossrush_probe.js}` (mirrored from the CSDK content dir; build = user compiles in csdkcfg GUI → VPK → DMM). Rename `bossrush_probe.js` someday.
-- **Icons: SOLVED** (reparented native icons → all correct/live).
-- **Layout:** header outside modal; JS-wired recoloring tabs; centered full-width grid of native cards (6/row) with a name-bar overlay; no custom detail panel.
-- **Sell→ENHANCE: the answer is found, not yet built.** The native sell badge re-renders continuously on hover (can't relabel/cover/override without killing the tooltip). The native game has an enhance mode: `PopupPickEnhanceItem .owned:hover #EnhanceOverlay { visible }` + `#SellOverlay { collapse }` (native blue `#EnhanceOverlay`). NEXT: try our vcss `.owned:hover #SellOverlay{collapse}` + `.owned:hover #EnhanceOverlay{visible}` over the reparented cards. Remove the dead `addEnhanceBadge`/`.BREnhOverlay` cover attempt.
-- **Still open:** manilla tabs restyle; OWNED→ENHANCED state (`.isEnhanced`); the **enhance ACTION** (client→server still unsolved — clicking a card natively SELLS, so don't wire visuals to a working enhance until the channel exists); legendary BUY flow (`.IgnoreOwnership`); fonts; hide native HUD bits.
+### THE KEY BREAKTHROUGH — how the client talks to the server (the niche finding that unlocked everything)
+- Panorama has **NO** client→server channel we can call: no console-command runner, no convar setter, no chat-send, no Dota-style custom events. (Confirmed exhaustively; the chat-injection attempt failed — couldn't even fill the chat box.)
+- **BUT** the client relays shop/UI actions to the server as **plaintext command strings inside net message `msgId 282 = CM_ClientUIEvent`** (`deadlock/clientmessages.proto`). Clicking an owned item sends **`"sellitem <upgrade_name>"`**, a buy sends **`"buyitem <upgrade_name>"`**; same channel carries `open_item_shop`, `exit_item_shop`, `changeteam 3`, `selecthero hero_x`, `dw_br_loot 10`. The `<upgrade_name>` is the **exact internal catalog id** (e.g. `upgrade_high_velocity_mag`).
+- These relay to the server as **concommands**, caught by **`BossRushPlugin.OnClientConCommand(ClientConCommandEvent e)`** — which is **vetoable** (`return HookResult.Stop`). The fix: `if (e.Command == "sellitem")` → veto the native sell + `_upgrades.HandleShopEnhance(caller, e.Args[1])`. **GOTCHA: `e.Args` is argv-style — `Args[0]` is the command name, `Args[1]` is the item.**
+- **How we found it (reusable technique):** instrumented Deadworks CORE `EntryPoint.OnNetMessageIncoming` (`C:\deadworks\managed\EntryPoint.cs`) to log every incoming msgId+hex. It's fed by native hook `CServerSideClientBase::FilterMessage` which forwards ALL incoming client→server msgs. Noise: `msgId 4` & `21` are the per-tick flood; rare one-offs are discrete actions; the 282 bytes decode straight to ASCII. (Sniffer has been reverted — re-add it the same way to find any other client action.)
+
+### Server (all in `deadlock-boss-rush/server/BossRush/`)
+- `BossRushPlugin.OnClientConCommand` — the `sellitem`→enhance intercept (above).
+- `UpgradeStation.HandleShopEnhance` — charge 2× + `GrantTemporaryEnhanced`. **Re-enhance guard:** tracks enhanced items per player (`_enhancedByPlayer`, keyed by controller `EntityIndex`) because the API can't *read* an item's enhanced state — clicking an already-enhanced item would silently re-charge otherwise. Tuned for permanent enhancements (the default).
+- **Convars** (asserted on a `Timer.Every(5s)` loop because match-init resets `citadel_*` after `OnStartupServer`): `citadel_item_purchases_force_enhanced 1` (sv, cheat — native BUYS come out enhanced). The display convar `citadel_shop_items_appear_enhanced` is **CLIENT (cl) + cheat + not archived → CANNOT be automated**: server can't set it (engine: "missing required FCVAR flag"), Panorama has no convar API, autoexec is cheat-gated at startup, and an addon-shipped `cfg/autoexec.cfg` does NOT auto-exec (tested — dead). Only the user setting it client-side per session works. **We dropped trying to automate it.**
+
+### Client (`client/panorama/`, mirrored from CSDK content dir)
+- Reparent-native-cards architecture (`card.SetParent(tile)`; `#Shop{opacity:0}` keeps data live).
+- `bossrush_probe.js`: reads owned items → tiles; **hides the native "OWNED" overlay** (`#ItemPurchased`); relabels the native **"Sell Item?" confirm → "Enhance Item?"** + 2× price (`handleSellPopup`, found by *content* since the `MessageLabel`'s `.text` returns a localization token not the rendered string); flips the hover tooltip Sell→Enhance (`flipHoverTooltip`). Grid rebuilds on tab change **+ every ~2.4s** so enhances/sells refresh instead of lingering.
+- **DROPPED (don't re-add):** client-side enhanced detection / inert / "ENHANCED" tag — with `appear_enhanced` on, EVERY card reports `.isEnhanced`, so it false-positived and blocked clicking. Re-enhance protection is server-side instead. Also dropped: the dead chat-send + `IgnoreOwnership` (runtime `AddClass` does NOT change the C++ buy/sell wiring — that's fixed at card construction).
+
+### BUILD PIPELINE — the agent can now drive ALL of it (see `reference_csdk-build-pipeline.md`)
+- **Server:** `dotnet build server/BossRush/BossRush.csproj -c Release -p:DeadworksManagedDir="F:\…\Deadlock\game\bin\win64\managed"` → deploys `BossRush.dll` to `managed/plugins` and **hot-reloads** live (no restart). Deadworks SDK source at `C:\deadworks`.
+- **Client compile:** `…\game\bin_server\win64\resourcecompiler.exe -f -danger_mode_ignore_schema_mismatches -game "…\game\citadel" -i "<content file>"` (the `-danger…` flag = the GUI's "DANGER ZONE" toggle; without it the compile aborts on schema mismatch).
+- **Client pack+deploy:** `…\game\bin\win64\CSDKCfgVPK.exe "<addon folder>" "<out>\pak01_dir.vpk"` (writes in ~3s, doesn't self-terminate → `timeout 6`), then `cp` over the live DMM profile vpk `F:\…\citadel\addons\profile_1781636185610_bor87xr33_pve-boss-rush\pak01_dir.vpk`. **Deadlock must be CLOSED for the vpk swap** (file locked while running); the core `DeadworksManaged.dll` likewise needs the server stopped; only the plugin hot-reloads live.
+
+### Still open / parked (not blockers)
+- Pre-enhance enhanced-stats DISPLAY in the shop = only via `appear_enhanced`, which can't be automated (above). Live with base stats + the "Enhance + 2× price" hover, or the user sets the convar/bind themselves.
+- Legendary BUY flow (T5 at flat price), manilla tab restyle, Deadlock fonts, hide native HUD bits (souls/quickbuy), rename `bossrush_probe.js`.
 
 ---
 

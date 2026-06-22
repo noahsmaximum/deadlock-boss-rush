@@ -1,0 +1,16 @@
+<!-- Boss Rush override of the shop hover tooltip. Identical to the native layout, plus one extra
+     style include (bossrush_tooltip.vcss) that flips the #ModView preview's Sell badge to the native
+     Enhance overlay. The override is needed because this tooltip is its own layout scope; our shop
+     stylesheet can't reach it from citadel_hud_hero_shop.xml. -->
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/citadel_base_styles.vcss_c" />
+		<include src="s2r://panorama/styles/tooltips/citadel_tooltip_mod_hover.vcss_c" />
+		<include src="s2r://panorama/styles/bossrush_tooltip.vcss_c" />
+	</styles>
+	<Panel class="ModHoverContents BRHoverOverride" hittest="false" hittestchildren="false">
+		<Panel id="BackgroundTexture" />
+		<Panel id="BackgroundTexture2" />
+		<CitadelShopMod id="ModView" />
+	</Panel>
+</root>

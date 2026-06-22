@@ -34,6 +34,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     private LootSystem _loot = null!;
     private UpgradeStation _upgrades = null!;
     private RegenSystem _regen = null!;
+    private IHandle? _shopConvarTimer;
 
     public override void OnLoad(bool isReload)
     {
@@ -45,6 +46,16 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         _upgrades = new UpgradeStation(Config, _enhancements);
         _regen = new RegenSystem(Config, Timer);
 
+        // Keep the (server-side) buy-enhanced convar asserted — match-init resets citadel_* convars after
+        // OnStartupServer. NOTE: citadel_shop_items_appear_enhanced (the shop DISPLAY-enhanced convar) is CLIENT +
+        // cheat with no archive flag — the server can't set it (engine blocks ClientCommand: "missing required
+        // FCVAR flag"), Panorama has no convar API, and it doesn't persist. It can only be set client-side each
+        // session (e.g. a key bind), so it's intentionally not automated here.
+        _shopConvarTimer = Timer.Every(5.Seconds(), () =>
+        {
+            ConVar.Find("citadel_item_purchases_force_enhanced")?.SetInt(1);
+        });
+
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
             : "[Boss Rush] loaded. Loot the lanes. Kill the Patron.");
@@ -54,6 +65,7 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     public override void OnUnload()
     {
         // Cancel timers so a hot-reload doesn't leak loops.
+        _shopConvarTimer?.Cancel();
         _rageWaves.Stop();
         _spawns.Stop();
         _patron.Stop();
@@ -90,6 +102,14 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         ConVar.Find("citadel_allow_purchasing_anywhere")?.SetInt(1);
         ConVar.Find("citadel_allow_duplicate_heroes")?.SetInt(1);
 
+        // EXPERIMENT (buy-enhanced pivot): make every native purchase grant the item's ENHANCED variant, and
+        // make the shop DISPLAY items with enhanced data (so cards/tooltips show real enhanced stats before buying).
+        // This lets the Upgrade Station sell enhanced items through the native BUY flow — souls spent and item
+        // granted by the engine, no custom client→server channel needed. The client adds the native IgnoreOwnership
+        // class to owned cards so clicking BUYS (enhanced) instead of selling. Reversible: drop these lines.
+        ConVar.Find("citadel_item_purchases_force_enhanced")?.SetInt(1);
+        ConVar.Find("citadel_shop_items_appear_enhanced")?.SetInt(1);
+
         // Front-load loot crates: spawn them at match start instead of after the default delay (the bridge-buff
         // powerup spawners are a separate system and untouched). Convar names confirmed in server.dll.
         if (Config.FrontloadCrates)
@@ -117,6 +137,28 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     {
         if (args.Entity.As<CCitadelPlayerPawn>() is { } pawn)
             _regen.OnHeroDamaged(pawn);
+        return HookResult.Continue;
+    }
+
+    /// <summary>
+    /// Upgrade Station — the real intercept. The client relays shop clicks to the server as concommands (over
+    /// CM_ClientUIEvent): clicking an OWNED item sends "sellitem &lt;upgrade_name&gt;", a buy sends
+    /// "buyitem &lt;upgrade_name&gt;" — the item is the exact internal catalog name (e.g. upgrade_high_velocity_mag).
+    /// We turn the SELL into an enhance: veto the native sell (HookResult.Stop) and enhance the still-held item
+    /// (charge 2× + grant the enhanced variant). One click = enhance, no client channel, no UI hacks. Buys pass
+    /// through (citadel_item_purchases_force_enhanced already makes them enhanced).
+    /// </summary>
+    public override HookResult OnClientConCommand(ClientConCommandEvent e)
+    {
+        if (e.Command is "sellitem" or "buyitem")
+            Console.WriteLine($"[Boss Rush] shop cmd: {e.Command} [{string.Join(" ", e.Args)}]");
+
+        // Args is argv-style: Args[0] is the command name ("sellitem"), Args[1] is the item (upgrade_<name>).
+        if (e.Command == "sellitem" && e.Args.Length > 1 && e.Controller is { } caller)
+        {
+            _upgrades.HandleShopEnhance(caller, e.Args[1]); // item still held (we block the sell) → enhances in place
+            return HookResult.Stop;                          // veto the native sell
+        }
         return HookResult.Continue;
     }
 
