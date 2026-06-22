@@ -1,0 +1,21 @@
+/* ════════════════════════════════════════════════════════════════════════════════════════
+   Boss Rush — flip the HOVER TOOLTIP card preview from "Sell" to the native "Enhance" overlay.
+
+   The hover tooltip (citadel_tooltip_mod_hover.xml) is its own Panorama layout, loaded at the
+   global tooltip layer — NOT a child of our shop — so the shop's bossrush_shop.vcss never reaches
+   it. It renders #ModView, a clone of the card (citadel_shop_mod_view). The native card stylesheet
+   shows the Sell badge on that clone with NO hover required, purely because it's owned and inside
+   the tooltip:
+       #CitadelModHoverTooltip.owned #SellOverlay { visibility: visible; }   (citadel_shop_mod_view.css:774)
+   and the native #EnhanceOverlay only un-collapses under a PopupPickEnhanceItem ancestor we don't have.
+
+   We re-scope the same flip here (this file is injected into the tooltip layout via our override of
+   citadel_tooltip_mod_hover.xml). The extra #ModView id raises specificity (3 ids + 1 class) above the
+   native rules so we win regardless of stylesheet load order — no !important needed.
+
+   NOTE: the native #EnhanceOverlay shows "Enhance" + the item name only — it carries NO price label
+   (the price lived on #SellOverlay's {i:sell_cost}). So this proves the swap; a doubled-price number
+   is a later refinement (would need to inject a label into #EnhanceOverlay). Flagging that, not claiming it. */
+
+#CitadelModHoverTooltip.owned #ModView #SellOverlay    { visibility: collapse; }
+#CitadelModHoverTooltip.owned #ModView #EnhanceOverlay { visibility: visible; }

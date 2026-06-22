@@ -14,6 +14,8 @@ public sealed class UpgradeStation
 {
     private readonly BossRushConfig _cfg;
     private readonly EnhancementSystem _enhancements;
+    // Items we've already enhanced this match, per player (controller EntityIndex) — re-enhance guard.
+    private readonly Dictionary<int, HashSet<string>> _enhancedByPlayer = new();
 
     public UpgradeStation(BossRushConfig cfg, EnhancementSystem enhancements)
     {
@@ -61,6 +63,42 @@ public sealed class UpgradeStation
             ? $"[Boss Rush] Enhanced {Pretty(itemName)} (T{tier}) for {cost}."
             : $"[Boss Rush] Enhanced {Pretty(itemName)} (T{tier}) for {cost} — lasts {_cfg.EnhancementDurationSeconds:F0}s.";
         return true;
+    }
+
+    /// <summary>
+    /// Enhance triggered by the client shop UI: clicking an owned item sends "sellitem &lt;upgrade_name&gt;", which
+    /// <see cref="BossRushPlugin.OnClientConCommand"/> VETOES (so the item stays held) and routes here. Charges 2×
+    /// the tier price and grants the enhanced variant. Guards against re-enhancing the same item (clicking an
+    /// already-enhanced item would silently re-charge, since the item name is identical for base + enhanced and the
+    /// API can't read enhanced state). The guard is tuned for permanent enhancements (the default); a timed
+    /// enhancement that reverts won't be re-enhanceable until next match — acceptable for now.
+    /// </summary>
+    public void HandleShopEnhance(CCitadelPlayerController caller, string itemName)
+    {
+        var pawn = caller.GetHeroPawn()?.As<CCitadelPlayerPawn>();
+        if (pawn == null) return;
+
+        int tier = ItemCatalog.TierOf(itemName);
+        if (tier <= 0) { Chat.PrintToChat(caller, $"[Boss Rush] can't enhance — unknown item '{itemName}'."); return; }
+        if (!Holds(pawn, itemName)) { Chat.PrintToChat(caller, $"[Boss Rush] you must hold {Pretty(itemName)} to enhance it."); return; }
+
+        if (!_enhancedByPlayer.TryGetValue(caller.EntityIndex, out var done))
+            _enhancedByPlayer[caller.EntityIndex] = done = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (done.Contains(itemName)) { Chat.PrintToChat(caller, $"[Boss Rush] {Pretty(itemName)} is already enhanced."); return; }
+
+        int cost = (int)MathF.Round(TierPrice(tier) * _cfg.UpgradeCostMultiplier);
+        if (pawn.GetCurrency(ECurrencyType.EGold) < cost)
+        {
+            Chat.PrintToChat(caller, $"[Boss Rush] need {cost} souls to enhance {Pretty(itemName)}.");
+            return;
+        }
+
+        pawn.ModifyCurrency(ECurrencyType.EGold, -cost, ECurrencySource.ECheats, spendOnly: true);
+        _enhancements.GrantTemporaryEnhanced(pawn, itemName); // RemoveItem(base) + AddItem(enhanced)
+        done.Add(itemName);
+        Chat.PrintToChat(caller, _cfg.EnhancementPermanent
+            ? $"[Boss Rush] Enhanced {Pretty(itemName)} (T{tier}) for {cost}."
+            : $"[Boss Rush] Enhanced {Pretty(itemName)} (T{tier}) for {cost} — lasts {_cfg.EnhancementDurationSeconds:F0}s.");
     }
 
     // ── Buy a legendary (top-tier) item (flat price) ────────────────────────────────

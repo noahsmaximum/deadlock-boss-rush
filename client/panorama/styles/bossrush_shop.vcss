@@ -156,6 +156,23 @@
 	vertical-align: center;
 }
 
+/* ENHANCED tag — centered overlay shown on enhanced (maxed) tiles in place of the native "OWNED" (which we hide).
+   The card under it is set hittest=false, so enhanced items are inert (no re-enhance). */
+.BREnhancedTag
+{
+	width: 100%;
+	height: 28px;
+	horizontal-align: center;
+	vertical-align: center;
+	text-align: center;
+	font-size: 16px;
+	font-weight: bold;
+	letter-spacing: 2px;
+	color: #3FDCFF;
+	text-shadow: 0px 0px 9px 2.0 #06212e, 0px 1px 2px 1.0 #000000;
+}
+.catLegendary .BREnhancedTag { color: #c8b8ff; }
+
 /* enhanced tile flair (game cyan + the real enhanced arrow asset) */
 .BRTileEnhanced { border: 2px solid #3FDCFF; box-shadow: 0px 0px 14px 2px #3fdcff66; }
 .BREnhancedArrow
@@ -252,25 +269,17 @@
 /* ── Footer ── */
 .BRFooter { font-size: 11px; color: #6e5417; horizontal-align: center; margin-top: 10px; }
 
-/* our ENHANCE badge — layered over the native sell badge, shown on hover (hittest off, so the
-   native card still gets the hover for its tooltip). Covers the native "Sell". */
-.BREnhOverlay
-{
-	width: 124px;
-	height: 144px;
-	horizontal-align: center;
-	vertical-align: center;
-	flow-children: down;
-	padding: 10px;
-	background-color: #0b0b12f2;
-	border-radius: 10px;
-	box-shadow: 0px 0px 12px 2px #00000099;
-	visibility: collapse;
-}
-.BRTile:hover .BREnhOverlay { visibility: visible; }
-.BREnhWord  { font-size: 17px; font-weight: bold; color: #FFD24A; letter-spacing: 1px; horizontal-align: center; vertical-align: center; }
-.BREnhName  { font-size: 13px; font-weight: bold; color: #f0e6d2; horizontal-align: center; text-align: center; width: 100%; margin-top: 6px; }
-.BREnhPrice { font-size: 18px; font-weight: bold; color: #38E0C8; horizontal-align: center; vertical-align: center; margin-top: 8px; }
+/* ── Sell → ENHANCE (native enhance mode) ──────────────────────────────────────────────────
+   The reparented native cards carry their own #SellOverlay (hover "Sell") and a built-in,
+   fully-native-styled #EnhanceOverlay (blue gradient). The game normally flips between them
+   inside a PopupPickEnhanceItem context:
+       PopupPickEnhanceItem .owned:hover #SellOverlay   { visibility: collapse; }
+       PopupPickEnhanceItem .owned:hover #EnhanceOverlay { visibility: visible; }
+   We can't reproduce that panel TYPE ancestor, but the cards now live inside .BRTile, so we
+   re-scope the same flip under .BRTile (extra class → wins specificity over the card's own
+   citadel_shop_mod_view.vcss). On hover: hide the sell badge, reveal the native enhance badge. */
+.BRTile .owned:hover #SellOverlay    { visibility: collapse; }
+.BRTile .owned:hover #EnhanceOverlay { visibility: visible; }
 
 /* ════ Category theming ════════════════════════════════════════════════════════════════
    JS toggles cat{Weapon,Armor,Tech,Legendary} on the modal as tabs are clicked; the UI recolors.
