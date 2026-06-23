@@ -1,8 +1,40 @@
 # Deadlock BOSS RUSH — Project Handoff & State
 
 > **⚠️ Sections 1–12 + older CURRENT STATE blocks below are STALE snapshots. Read the
-> 2026-06-22 block first; trust it over everything older where they conflict.** Deep detail also lives
-> in agent memory `reference_deadlock-shop-current-state.md` + `reference_csdk-build-pipeline.md`.
+> 2026-06-23 + 2026-06-22 blocks first; trust them over everything older where they conflict.** Deep detail
+> also lives in agent memory `reference_deadlock-shop-current-state.md` + `reference_csdk-build-pipeline.md`.
+
+---
+
+## CURRENT STATE — 2026-06-23 ✅ MYTHIC ALTAR: LEGENDARY BUY WORKING END-TO-END
+
+Branch `feat/p3-rem-sleep` (committed `60db099`). The **MYTHIC tab** sells the 17 "legendary" items as real store cards; clicking one buys it for a flat **30,000** souls (config `LegendaryPrice`). Server + client both done.
+
+### THE BREAKTHROUGH — how the legendaries got into the store (the niche finding)
+- The 23 "legendaries" are **Street Brawl items**: each carries `m_eAbilityRequirements = "ERequirementStreetBrawl"` + `m_iItemTier = "EModTier_5"` (icons under `items/brawl/`). Exactly 23 items in the game data have that requirement = our legendary set. The normal shop **excludes them by tier (only enumerates T1–4)** AND the client **suppresses the buy** (won't even send `buyitem`) because the StreetBrawl requirement isn't met.
+- **UNLOCK = two CLIENT `abilities.vdata` edits, BOTH required (either alone fails):**
+  1. **Strip the requirement** — delete the `m_eAbilityRequirements = "ERequirementStreetBrawl"` line (23 of them) so the client stops suppressing the buy.
+  2. **Relabel tier** — `m_iItemTier "EModTier_5" → "EModTier_4"` (27 lines) so the store *enumerates* them as cards.
+  Then **17 of the 23 render** as real, buy-wired store cards in the weapon/armor/tech category lists (the other 6 lack store-card structure). The SERVER keeps reading tier 5 from its own `all_items_tiers.txt` (we only edited the client VPK), so our intercept still recognizes them as legendaries.
+- **Enabling Street Brawl mode itself (`citadel_gamemode_streetbrawl_enabled 1`) CRASHES the server** — do NOT. The client-vdata requirement-strip is the safe substitute.
+
+### Server (`BossRushPlugin.OnClientConCommand` — all vetoable concommands)
+- `buyitem <T5>` → veto native + flat-charge `LegendaryPrice` (30k) + grant. `buyitem <non-T5>` → blocked (`StoreLegendariesOnly`; loot-only economy).
+- `buydependentitem <T5>` = the **imbue legendaries** (only 2: `upgrade_shivas_bracelet`, `upgrade_omnicharge_pendant`). Vetoing skips the imbue, so we let native imbue+charge run, then `Timer.Once(0.2s)` forces the player's **net** gold to `before − LegendaryPrice` (exact 30k regardless of what the engine charged).
+- **Removed `citadel_item_purchases_force_enhanced`** (it auto-enhanced native/imbue buys) + the `appear_enhanced` no-op + the convar re-assert timer. Flex slots unlocked in `ApplyRuleset` (`citadel_hero_demo_unlock_flex_slots 1` + `citadel_unlock_flex_slots`).
+
+### Client (`bossrush_probe.js`, MYTHIC tab)
+- Reads the **category lists** `ShopModsListWeapon/Armor/Tech` (NOT `ShopModsListAll` — that's the *search* list, empty without a query), filters to the 17 legendaries by display name (`LEGENDARY_NAMES`), reparents those store cards. `selectTab` dispatches all three slots to populate them.
+- Forces the card price label to `30,000` and hides the enhance/sell overlays on buy cards; `flipHoverTooltip` clears the stale enhance-flip on unowned cards (the tooltip panel is shared) and relabels legendary cost to 30k.
+
+### Dropped dead-ends (don't retry)
+- The **build/favorites view**: `ShopModsSelectedBuild` cards render any tier (no filter) but are **display-only / not buy-wired**; activating `EItemSlotType_Favorites` to wire them **crashes** on shop-reopen (reparenting C++ build cards mid-buy). Abandoned for the store-card path above.
+- Tier-relabel *alone* (requirement still present) and requirement-strip *alone* (tier still 5) both fail — needs both.
+
+### Still OPEN (next session)
+- **Shop shows 12,800 on items** (a display bug that appeared with the legendary vdata work — NOT `appear_enhanced`, which was on long before). Suspect: the danger-mode recompile of the full abilities.vdata, or shipping stale 18900-dump data for ALL items.
+- **True unlimited item slots** — flex unlock helps but still caps ~12; the real cap is `m_mapItemSlotInfo.m_arMaxPurchasesForTier = [6,6,6]` per category in `heroes.vdata` (118k lines, **monolithic — no `_include`**, 192 uniform entries). The shop BUY enforces slots client-side (replace-prompt fires before the command reaches us); `AddItem` grants bypass it.
+- **The `_include` rework (fixes the stale-data root cause):** the game's `abilities.vdata` is a tiny file that does `_include = [ resource_name:"scripts/abilities/<hero>.vdata_inc", … ]` to pull current per-hero content. Our override ships the WHOLE old dump → every item uses stale data. Rebuild our override as: header + `_include[all base incs]` + only the ~50 lines of legendary edits (re-defined keys after the include override the included ones). Shrinks 6.9MB→tiny and likely fixes the 12,800. NOTE: `heroes.vdata` has NO include array, so the slot edit needs a different shape (KV3 deep-merge semantics on a re-included base TBD — ask user).
 
 ---
 
