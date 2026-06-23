@@ -23,56 +23,85 @@
     // inline visibility beats the stylesheet and is deterministic. Only the tooltip preview is
     // touched (the real grid card flip is handled by .BRTile CSS). Cheap: one traverse, gated to
     // when the shop is open.
+    // The first Label child under the EnhanceOverlay's EnhancedIndicator (the "Enhance" word).
+    function enhanceWordLabel(eo) {
+        var ind = null; try { ind = eo.FindChildTraverse("EnhancedIndicator"); } catch (e) {}
+        if (!ind) return null;
+        var ch = null; try { ch = ind.Children(); } catch (e) {}
+        if (ch) for (var i = 0; i < ch.length; i++) if (ch[i].paneltype === "Label") return ch[i];
+        return null;
+    }
+
     function flipHoverTooltip(top) {
         var tt = top.FindChildTraverse("CitadelModHoverTooltip");
-        if (!tt) return;
-        var so = null, eo = null;
+        if (!tt) return;   // no tooltip on screen → skip all the per-tick traversals below
+        // Hide the price on the EXTENDED details tooltip (CitadelTooltipModDetails → ModCostContainer holds the
+        // goldIcon + ModCost label) for every item — our own row shows the right number on the card preview.
+        try { var mccs = top.FindChildrenWithClassTraverse("ModCostContainer"); for (var z = 0; mccs && z < mccs.length; z++) mccs[z].visible = false; } catch (e) {}
+        var so = null, eo = null, ic = null, nmEl = null;
         try { so = tt.FindChildTraverse("SellOverlay"); } catch (e) {}
         try { eo = tt.FindChildTraverse("EnhanceOverlay"); } catch (e) {}
+        try { ic = tt.FindChildTraverse("ItemCost"); } catch (e) {}
+        try { nmEl = first(tt, "modName"); } catch (e) {}
+        // Hide the native price on the extended tooltip for EVERY item — it's wrong for enhances/legendaries and
+        // our own row shows the correct number. We only READ ic's text (never write it), so nothing leaks across
+        // the shared tooltip to other items (that was the 60k bug).
+        try { if (ic) ic.visible = false; } catch (e) {}
         var owned = false; try { owned = tt.BHasClass("owned"); } catch (e) {}
-        if (!owned) {
-            // The tooltip panel is SHARED across hovers — our inline visible=true sticks, so after hovering an
-            // owned item the Enhance overlay would wrongly persist on the next (unowned) card. Clear it. And if
-            // this is a legendary, relabel the cost to the flat legendary price (it's a BUY, not an enhance).
+        var nm = nmEl ? ("" + nmEl.text).toLowerCase() : "";
+        var isLegend = nm && LEGENDARY_NAMES[nm];
+        var row = tt.FindChildTraverse("BREnhPrice");   // our injected price row (the tooltip panel is SHARED/reused)
+
+        // Normal un-owned item (not a legendary) → native buy tooltip; clear any stale enhance flip + our row.
+        if (!isLegend && !owned) {
+            try { if (row) row.visible = false; } catch (e) {}
             try { if (eo) eo.visible = false; } catch (e) {}
-            var lnEl = null; try { lnEl = first(tt, "modName"); } catch (e) {}
-            var ln = lnEl ? ("" + lnEl.text).toLowerCase() : "";
-            if (ln && LEGENDARY_NAMES[ln]) {
-                try { var lic = tt.FindChildTraverse("ItemCost"); if (lic) lic.text = fmt(LEGENDARY_PRICE); } catch (e) {}
-            }
             return;
         }
+
+        // OWNED (enhance, this item's 2× cost) or LEGENDARY (buy, flat price) → show the overlay + our price row.
         try { if (so) so.visible = false; } catch (e) {}
         try { if (eo) eo.visible = true; } catch (e) {}
         if (!eo) return;
+        var price;
+        if (isLegend) price = LEGENDARY_PRICE;
+        else { var base = 0; if (ic) { try { base = parseCost(ic.text); } catch (e) {} } price = base ? base * 2 : 0; }
+        try { var word = enhanceWordLabel(eo); if (word) word.text = isLegend ? "Buy" : "Enhance"; } catch (e) {}
+        // The enhance arrow (enhancedIcon) belongs only to an actual enhance — hide it on legendary BUY cards.
+        try { var ei = eo.FindChildrenWithClassTraverse("enhancedIcon"); for (var q = 0; ei && q < ei.length; q++) ei[q].visible = !isLegend; } catch (e) {}
 
-        // Native #EnhanceOverlay shows "Enhance" + name only — inject the 2× cost, styled to match the
-        // native sell price (souls icon + ~16px bold number, centered). The tooltip is a fresh panel each
-        // hover, so our row vanishes with it; re-add when missing (id guards dupes).
-        var has = null; try { has = eo.FindChildTraverse("BREnhPrice"); } catch (e) {}
-        if (has) return;
-        var base = 0, ic = null;
-        try { ic = tt.FindChildTraverse("ItemCost"); } catch (e) {}
-        if (ic) { try { base = parseCost(ic.text); } catch (e) {} }
-        var price = base ? base * 2 : 0;
-        if (!price) return;   // no cost read → skip the row rather than show a bare word
-        var mc = eo;
-        try { var arr = eo.FindChildrenWithClassTraverse("MessageContent"); if (arr && arr.length) mc = arr[0]; } catch (e) {}
-        var row = $.CreatePanel("Panel", mc, "BREnhPrice");
-        try { row.style.flowChildren = "right"; row.style.horizontalAlign = "center"; row.style.marginTop = "6px"; } catch (e) {}
-        // reuse the real native souls icon from the (hidden) sell overlay for an exact match
-        if (so) {
-            var gi = null; try { gi = so.FindChildrenWithClassTraverse("goldIcon"); } catch (e) {}
-            if (gi && gi.length) {
-                try { gi[0].SetParent(row); gi[0].style.width = "18px"; gi[0].style.height = "18px"; gi[0].style.marginRight = "5px"; gi[0].style.verticalAlign = "middle"; gi[0].visible = true; } catch (e) {}
+        var amt = row ? row.FindChildTraverse("BREnhAmt") : null;
+        if (!row && price) {
+            var mc = eo;
+            try { var arr = eo.FindChildrenWithClassTraverse("MessageContent"); if (arr && arr.length) mc = arr[0]; } catch (e) {}
+            row = $.CreatePanel("Panel", mc, "BREnhPrice");
+            try { row.style.flowChildren = "right"; row.style.horizontalAlign = "center"; row.style.marginTop = "6px"; } catch (e) {}
+            if (so) { // reuse the real native souls icon from the (hidden) sell overlay for an exact match
+                var gi = null; try { gi = so.FindChildrenWithClassTraverse("goldIcon"); } catch (e) {}
+                if (gi && gi.length) {
+                    try { gi[0].SetParent(row); gi[0].style.width = "16px"; gi[0].style.height = "16px"; gi[0].style.marginRight = "1px"; gi[0].style.verticalAlign = "middle"; gi[0].visible = true; } catch (e) {}
+                }
             }
+            amt = $.CreatePanel("Label", row, "BREnhAmt");
+            try {
+                amt.style.fontSize = "16px"; amt.style.fontWeight = "bold"; amt.style.color = "#ffffff";
+                amt.style.verticalAlign = "middle"; amt.style.textShadow = "0px 0px 5px 2.0 #000000";
+            } catch (e) {}
         }
-        var amt = $.CreatePanel("Label", row, "");
-        amt.text = fmt(price);
-        try {
-            amt.style.fontSize = "17px"; amt.style.fontWeight = "bold"; amt.style.color = "#ffffff";
-            amt.style.verticalAlign = "middle"; amt.style.textShadow = "0px 0px 5px 2.0 #000000";
-        } catch (e) {}
+        // CRITICAL: update the amount every hover (the row persists on the shared tooltip), else the first
+        // hovered item's price sticks for all of them.
+        try { if (row) row.visible = !!price; } catch (e) {}
+        try { if (amt && price) amt.text = fmt(price); } catch (e) {}
+    }
+
+    // "ITEM SLOTS FULL — select an item to replace" pops on a full-slot buy. Because our sellitem intercept turns
+    // the chosen "replacement" into an ENHANCE (and the new item is still granted), this dialog actually enhances
+    // an existing item + grants the new one. Relabel it to say so instead of "replace".
+    function handleSlotsFullPopup(top) {
+        var title = findLabelByText(top, "item slots full", 0);
+        if (title) { try { title.text = "ENHANCE A FREE ITEM!"; } catch (e) {} }
+        var sub = findLabelByText(top, "an item to replace", 0) || findLabelByText(top, "to replace", 0);
+        if (sub) { try { sub.text = "Select an item to ENHANCE →"; } catch (e) {} }
     }
 
     // ── Tabs ──
@@ -286,13 +315,14 @@
         else setText(top, "BRActionLbl", item.cost ? ("ENHANCE  ◈ " + fmt(item.cost * 2)) : "ENHANCE");
     }
 
-    var gridTick = 0, lastGridDbg = "", lastLegendDbg = "";
+    var gridTick = 0, lastGridDbg = "", lastLegendDbg = "", lastGridCount = 0;
     function populateGrid(top) {
         gridTick++;
-        // Rebuild on tab change, otherwise periodically (~2.4s) so enhancing/selling refreshes the cards
-        // instead of lingering until a tab switch. (Can't cheaply detect the change without rebuilding,
-        // since borrowed cards leave the native list — so we throttle a periodic rebuild.)
-        if (activeDef.list === lastGridSig && (gridTick % 8 !== 0)) return;
+        // Rebuild ONLY on tab change (and keep retrying until the native list has populated, lastGridCount===0).
+        // NO periodic rebuild: reparenting ~17 native cards on a timer churns the DOM on the main thread, which
+        // drives usercmd send → prediction desync → game hitch. A bought legendary just lingers in the for-sale
+        // list until you switch tabs (harmless — re-buy is server-guarded; enhancing doesn't change the set).
+        if (activeDef.list === lastGridSig && lastGridCount > 0) return;
         lastGridSig = activeDef.list;
 
         returnBorrowed();                              // cards back to the native list before reading it
@@ -329,6 +359,7 @@
             var nm = $.CreatePanel("Label", bar, ""); nm.AddClass("BRTileName"); nm.text = it.name;
         });
 
+        lastGridCount = items.length;
         setText(top, "BRHeld", items.length + (legendary ? " FOR SALE" : " HELD"));
     }
 
@@ -372,28 +403,47 @@
         try { msg.text = newText; } catch (e) {}
     }
 
-    var cTop = null, cModal = null, cStation = null;
+    var cTop = null, cModal = null, cStation = null, cShop = null;
     function apply() {
         if (!cTop) cTop = topOf($.GetContextPanel());
         if (!cTop) { $.Schedule(0.5, apply); return; }
         if (!cModal)   cModal   = first(cTop, "BRModal");
         if (!cStation) cStation = first(cTop, "BRStation");
         if (!cModal || !cStation) { $.Schedule(0.5, apply); return; }
+        if (!cShop) {  // the CitadelHudHeroShop root carries the gShopOpen class C++ toggles on open/close
+            var p = cStation;
+            try { while (p && p.paneltype !== "CitadelHudHeroShop") p = p.GetParent(); } catch (e) {}
+            cShop = p;
+        }
 
-        // Only do heavy work while the shop is actually on screen. This poll runs forever; when the
-        // shop is closed it must stay cheap, or it stalls the main thread every tick — which also
-        // drives usercmd send, so a stall there desyncs client prediction and hitches the game.
-        // BRStation collapses to 0 width when the shop is hidden → single-property open check.
-        var open = false;
-        try { open = cStation.actuallayoutwidth > 0; } catch (e) {}
-        if (!open) { $.Schedule(0.4, apply); return; }
+        // Only do heavy work while the shop is actually ON SCREEN. The shop layout stays ACTIVE/laid-out in the
+        // background after the first open (so actuallayoutwidth is useless) — gate on the gShopOpen class the
+        // engine toggles instead. When it's closed the poll must stay cheap, or it stalls the main thread every
+        // tick → starves usercmd send → client prediction desync → game hitch.
+        var open = true;
+        try { if (cShop) open = cShop.BHasClass("gShopOpen"); else open = cStation.actuallayoutwidth > 0; } catch (e) {}
+        if (!open) {
+            // Shop closed: hand the borrowed native cards BACK to their lists. While they're reparented into our
+            // grid the native shop's own per-frame update loop churns over the misplaced panels — that runs
+            // regardless of our poll and hitches the game even while the shop is hidden. Force a rebuild on reopen.
+            if (borrowedIcons.length) { returnBorrowed(); lastGridSig = ""; lastGridCount = 0; }
+            $.Schedule(0.4, apply);
+            return;
+        }
 
         wireTabs(cTop, cModal);
-        var L = cTop.FindChildTraverse(activeDef.list);
-        if (L) { var nc = []; collect(L, "CitadelShopMod", nc, 0); if (nc.length === 0) $.DispatchEvent("CitadelShopModsActivate", activeDef.slot); }
+        // Only probe the native list for late population BEFORE the grid is built — once built (lastGridCount>0)
+        // skip this full traverse + collect every tick.
+        if (lastGridCount === 0 || activeDef.list !== lastGridSig) {
+            var L = cTop.FindChildTraverse(activeDef.list);
+            if (L) { var nc = []; collect(L, "CitadelShopMod", nc, 0); if (nc.length === 0) $.DispatchEvent("CitadelShopModsActivate", activeDef.slot); }
+        }
         populateGrid(cTop);
-        flipHoverTooltip(cTop);
-        handleSellPopup(cTop);
+        flipHoverTooltip(cTop);                         // every tick — hover must feel responsive
+        if (gridTick % 2 === 0) {                        // popups stay on screen → relabel at half rate (full-tree
+            handleSellPopup(cTop);                       // text searches are the other main per-tick cost
+            handleSlotsFullPopup(cTop);
+        }
         $.Schedule(0.3, apply);
     }
 
