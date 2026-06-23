@@ -185,9 +185,12 @@ public sealed class BossRushConfig
     /// <summary>Base shop price per tier [index 0 unused, then T1..T5] — mirrors m_nItemPricePerTier.</summary>
     public int[] ItemTierPrices { get; set; } = { 0, 800, 1600, 3200, 6400, 9999 };
     /// <summary>Flat soul cost to buy a legendary (top-tier) item from the store.</summary>
-    public int LegendaryPrice { get; set; } = 25000;
+    public int LegendaryPrice { get; set; } = 30000;
     /// <summary>Which tier counts as "legendary" — buyable at the store; everything below is loot-only.</summary>
     public int LegendaryTier { get; set; } = 5;
+    /// <summary>The store sells ONLY legendaries (T5): clicking any other buyable card is blocked (power comes from
+    /// world loot, not the shop). Turn off to let base items be bought through the native flow again.</summary>
+    public bool StoreLegendariesOnly { get; set; } = true;
     // NOTE: a server-side BlockNativePurchases flag was removed — OnModifyCurrency.Stop can't veto a purchase
     // (verified in-game). Buy-gating lives in the client shop UI instead (hide un-owned items).
     /// <summary>Chance (0–1) that a world drop rolls an *enhanced* item instead of a base one. Keep tiny.</summary>

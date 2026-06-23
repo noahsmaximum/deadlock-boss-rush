@@ -26,11 +26,22 @@
     function flipHoverTooltip(top) {
         var tt = top.FindChildTraverse("CitadelModHoverTooltip");
         if (!tt) return;
-        var owned = false; try { owned = tt.BHasClass("owned"); } catch (e) {}
-        if (!owned) return;
         var so = null, eo = null;
         try { so = tt.FindChildTraverse("SellOverlay"); } catch (e) {}
         try { eo = tt.FindChildTraverse("EnhanceOverlay"); } catch (e) {}
+        var owned = false; try { owned = tt.BHasClass("owned"); } catch (e) {}
+        if (!owned) {
+            // The tooltip panel is SHARED across hovers — our inline visible=true sticks, so after hovering an
+            // owned item the Enhance overlay would wrongly persist on the next (unowned) card. Clear it. And if
+            // this is a legendary, relabel the cost to the flat legendary price (it's a BUY, not an enhance).
+            try { if (eo) eo.visible = false; } catch (e) {}
+            var lnEl = null; try { lnEl = first(tt, "modName"); } catch (e) {}
+            var ln = lnEl ? ("" + lnEl.text).toLowerCase() : "";
+            if (ln && LEGENDARY_NAMES[ln]) {
+                try { var lic = tt.FindChildTraverse("ItemCost"); if (lic) lic.text = fmt(LEGENDARY_PRICE); } catch (e) {}
+            }
+            return;
+        }
         try { if (so) so.visible = false; } catch (e) {}
         try { if (eo) eo.visible = true; } catch (e) {}
         if (!eo) return;
@@ -69,7 +80,9 @@
         { cls: "BRTabWeapon",    cat: "catWeapon",    slot: "EItemSlotType_WeaponMod", list: "ShopModsListWeapon", dir: "weapon",   name: "FAIRWAY",           grid: "OWNED · FAIRWAY",             action: "ENHANCE" },
         { cls: "BRTabArmor",     cat: "catArmor",     slot: "EItemSlotType_Armor",     list: "ShopModsListArmor",  dir: "vitality", name: "MPS",               grid: "OWNED · MPS",                 action: "ENHANCE" },
         { cls: "BRTabTech",      cat: "catTech",      slot: "EItemSlotType_Tech",      list: "ShopModsListTech",   dir: "spirit",   name: "CURIOSITY CATALOG", grid: "OWNED · CURIOSITY CATALOG",   action: "ENHANCE" },
-        { cls: "BRTabLegendary", cat: "catLegendary", slot: "EItemSlotType_All",       list: "ShopModsListAll",    dir: "",         name: "MYTHIC",            grid: "MYTHIC ALTAR · FOR PURCHASE",  action: "BUY RELIC" }
+        // Legendaries (T5). ShopModsListAll is the SEARCH list (empty w/o a query); the real items live in the
+        // category lists. We scan Weapon/Armor/Tech for tier-5 cards (see readBuyableLegendaries + selectTab).
+        { cls: "BRTabLegendary", cat: "catLegendary", slot: "EItemSlotType_Tech", list: "ShopModsListTech", dir: "", name: "MYTHIC", grid: "MYTHIC ALTAR · FOR PURCHASE", action: "BUY RELIC" }
     ];
     var activeDef = TAB_DEFS[0];
     var lastGridSig = "";
@@ -107,9 +120,17 @@
         });
         setText(top, "BRGridTitle", def.grid);
         lastGridSig = "";
-        $.DispatchEvent("CitadelShopModsActivate", def.slot);
-        $.Schedule(0.03, function () { populateGrid(top); });
-        $.Schedule(0.12, function () { populateGrid(top); });
+        if (def.cat === "catLegendary") {
+            // Populate all three category lists so we can scan them for tier-5 cards (shop is behind our overlay,
+            // so these dispatches don't visibly flicker). The last one (Tech) stays the active list for apply().
+            $.DispatchEvent("CitadelShopModsActivate", "EItemSlotType_WeaponMod");
+            $.Schedule(0.04, function () { $.DispatchEvent("CitadelShopModsActivate", "EItemSlotType_Armor"); });
+            $.Schedule(0.08, function () { $.DispatchEvent("CitadelShopModsActivate", "EItemSlotType_Tech"); });
+        } else {
+            $.DispatchEvent("CitadelShopModsActivate", def.slot);
+        }
+        $.Schedule(0.14, function () { populateGrid(top); });
+        $.Schedule(0.30, function () { populateGrid(top); });
     }
 
     var tabsWired = false;
@@ -125,6 +146,12 @@
 
     // ── Data ──
     var TIER_OF = { 800: 1, 1600: 2, 3200: 3, 6400: 4 };
+    var LEGENDARY_TIER = 5;
+    // The card carries a C++-set tier class ModTier1..ModTier4 (and, we expect, ModTier5 for legendaries).
+    function tierOfCard(c) {
+        for (var t = 1; t <= 6; t++) { try { if (c.BHasClass("ModTier" + t)) return t; } catch (e) {} }
+        return 0;
+    }
     function parseCost(s) { var n = parseInt((s || "").replace(/[^0-9]/g, ""), 10); return isNaN(n) ? 0 : n; }
     function fmt(n) { return (n + "").replace(/\B(?=(\d{3})+(?!\d))/g, ","); } // commas; toLocaleString isn't in Panorama JS
 
@@ -144,6 +171,60 @@
             var costEl = c.FindChildTraverse("ItemCost");
             var cost = costEl ? parseCost(costEl.text) : 0;
             out.push({ name: name, cost: cost, tier: TIER_OF[cost] || 0, icon: iconFor(def, name), card: c });
+        }
+        return out;
+    }
+
+    // The MYTHIC tab sells legendaries (T5), buyable. Unlike the other tabs (which show OWNED cards to enhance),
+    // this surfaces the UNOWNED legendary cards from the native list so clicking one fires the native "buyitem"
+    // command → the server intercepts it and grants the relic at the flat legendary price. A one-time console
+    // diagnostic reports the card/tier breakdown so we can confirm T5 cards actually appear in this list.
+    // MYTHIC = legendaries. They're Street-Brawl items the normal shop won't list (tier filter), BUT a BUILD
+    // renders any item id as a card regardless of tier, and with the StreetBrawl requirement stripped from our
+    // abilities.vdata the unowned ones are buyable → clicking fires "buyitem" → the server intercept charges the
+    // flat legendary price. So we read the player's SELECTED BUILD (which they've stocked with the legendaries)
+    // out of ShopModsSelectedBuild and reparent those cards into our grid. Diagnostic logs what it finds + whether
+    // each card is still purchase-disabled (so we can confirm the requirement strip took).
+    var LEGEND_LISTS = ["ShopModsListWeapon", "ShopModsListArmor", "ShopModsListTech"];
+    // The 17 brawl "legendaries". In our client vdata they're stripped of ERequirementStreetBrawl AND relabeled
+    // tier-5→4, so they now appear as real buy-wired store cards in the weapon/armor/tech category lists (mixed in
+    // with the 44 real tier-4 items). We pick them out by display name. Clicking one fires buyitem → the server
+    // (which still reads tier 5 from its own all_items_tiers.txt) flat-charges the legendary price.
+    var LEGENDARY_PRICE = 30000;   // flat price the server charges (must match BossRushConfig.LegendaryPrice)
+    var LEGENDARY_NAMES = {
+        "haunting shot": 1, "infinite rounds": 1, "runed gauntlets": 1, "celestial blessing": 1,
+        "cloak of opportunity": 1, "electric slippers": 1, "eternal gift": 1, "nullification burst": 1,
+        "seraphim wings": 1, "shadow strike": 1, "frostbite charm": 1, "mystic conduit": 1,
+        "mystical piano": 1, "omnicharge signet": 1, "prism blast": 1, "shrink ray": 1, "unstable concoction": 1
+    };
+    function readBuyableLegendaries(top, def) {
+        var out = [], seen = [], tierCounts = {}, names = [], perList = {};
+        for (var li = 0; li < LEGEND_LISTS.length; li++) {
+            var L = top.FindChildTraverse(LEGEND_LISTS[li]);
+            var cards = [];
+            if (L) collect(L, "CitadelShopMod", cards, 0);
+            perList[LEGEND_LISTS[li]] = cards.length;
+            for (var i = 0; i < cards.length; i++) {
+                var c = cards[i];
+                if (seen.indexOf(c) >= 0) continue; seen.push(c);
+                var tier = tierOfCard(c);
+                tierCounts[tier] = (tierCounts[tier] || 0) + 1;
+                var owned = false; try { owned = c.BHasClass("owned") || c.BHasClass("usedAsComponent"); } catch (e) {}
+                if (owned) continue;
+                var nmEl = first(c, "modName");
+                var name = nmEl ? nmEl.text : "";
+                if (!name || !LEGENDARY_NAMES[name.toLowerCase()]) continue;   // only the brawl legendaries
+                var costEl = c.FindChildTraverse("ItemCost");
+                var cost = costEl ? parseCost(costEl.text) : 0;
+                names.push(name + "($" + cost + ")");
+                out.push({ name: name, cost: cost, tier: LEGENDARY_TIER, icon: iconFor(def, name), card: c, buy: true });
+            }
+        }
+        var sig = JSON.stringify(perList) + "|" + JSON.stringify(tierCounts) + "|" + out.length;
+        if (sig !== lastLegendDbg) {
+            lastLegendDbg = sig;
+            $.Msg("[BR MYTHIC] perList=" + JSON.stringify(perList) + " byTier=" + JSON.stringify(tierCounts) + " legendaries(T5)=" + out.length);
+            for (var k = 0; k < names.length; k += 8) $.Msg("[BR MYTHIC names] " + names.slice(k, k + 8).join(", "));
         }
         return out;
     }
@@ -205,7 +286,7 @@
         else setText(top, "BRActionLbl", item.cost ? ("ENHANCE  ◈ " + fmt(item.cost * 2)) : "ENHANCE");
     }
 
-    var gridTick = 0, lastGridDbg = "";
+    var gridTick = 0, lastGridDbg = "", lastLegendDbg = "";
     function populateGrid(top) {
         gridTick++;
         // Rebuild on tab change, otherwise periodically (~2.4s) so enhancing/selling refreshes the cards
@@ -215,7 +296,8 @@
         lastGridSig = activeDef.list;
 
         returnBorrowed();                              // cards back to the native list before reading it
-        var items = readOwned(top, activeDef);
+        var legendary = (activeDef.cat === "catLegendary");
+        var items = legendary ? readBuyableLegendaries(top, activeDef) : readOwned(top, activeDef);
         var grid = first(top, "BRGrid");
         if (!grid) return;
         grid.RemoveAndDeleteChildren();
@@ -230,6 +312,14 @@
 
             // Hide the native "OWNED" overlay (#ItemPurchased is the owned/sold-out badge in the card).
             try { var ip = it.card.FindChildTraverse("ItemPurchased"); if (ip) ip.visible = false; } catch (e) {}
+
+            if (legendary) {
+                // These are BUY cards, not enhance: show the flat legendary price and kill any enhance/sell overlay
+                // (the card's native cost is the relabeled tier-4 price / appears doubled under appear_enhanced).
+                try { var ic = it.card.FindChildTraverse("ItemCost"); if (ic) ic.text = fmt(LEGENDARY_PRICE); } catch (e) {}
+                try { var eo = it.card.FindChildTraverse("EnhanceOverlay"); if (eo) eo.visible = false; } catch (e) {}
+                try { var so = it.card.FindChildTraverse("SellOverlay"); if (so) so.visible = false; } catch (e) {}
+            }
             // NOTE: no client-side "enhanced" detection — `.isEnhanced` is unreliable here because the
             // citadel_shop_items_appear_enhanced convar (if set) makes EVERY card report enhanced. Every owned
             // item stays clickable; re-enhancing an already-enhanced item is guarded server-side instead.
@@ -239,7 +329,7 @@
             var nm = $.CreatePanel("Label", bar, ""); nm.AddClass("BRTileName"); nm.text = it.name;
         });
 
-        setText(top, "BRHeld", items.length + " HELD");
+        setText(top, "BRHeld", items.length + (legendary ? " FOR SALE" : " HELD"));
     }
 
     // The native "Sell Item?" confirm (a popup_generic instance: #TitleLabel + #MessageLabel + OK/Cancel) only
