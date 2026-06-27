@@ -34,7 +34,6 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     private LootSystem _loot = null!;
     private UpgradeStation _upgrades = null!;
     private RegenSystem _regen = null!;
-    private IHandle? _shopConvarTimer;
 
     public override void OnLoad(bool isReload)
     {
@@ -46,16 +45,6 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         _upgrades = new UpgradeStation(Config, _enhancements);
         _regen = new RegenSystem(Config, Timer);
 
-        // Keep the (server-side) buy-enhanced convar asserted — match-init resets citadel_* convars after
-        // OnStartupServer. NOTE: citadel_shop_items_appear_enhanced (the shop DISPLAY-enhanced convar) is CLIENT +
-        // cheat with no archive flag — the server can't set it (engine blocks ClientCommand: "missing required
-        // FCVAR flag"), Panorama has no convar API, and it doesn't persist. It can only be set client-side each
-        // session (e.g. a key bind), so it's intentionally not automated here.
-        _shopConvarTimer = Timer.Every(5.Seconds(), () =>
-        {
-            ConVar.Find("citadel_item_purchases_force_enhanced")?.SetInt(1);
-        });
-
         Chat.PrintToChatAll(isReload
             ? "[Boss Rush] reloaded."
             : "[Boss Rush] loaded. Loot the lanes. Kill the Patron.");
@@ -65,7 +54,6 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
     public override void OnUnload()
     {
         // Cancel timers so a hot-reload doesn't leak loops.
-        _shopConvarTimer?.Cancel();
         _rageWaves.Stop();
         _spawns.Stop();
         _patron.Stop();
@@ -102,13 +90,23 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
         ConVar.Find("citadel_allow_purchasing_anywhere")?.SetInt(1);
         ConVar.Find("citadel_allow_duplicate_heroes")?.SetInt(1);
 
-        // EXPERIMENT (buy-enhanced pivot): make every native purchase grant the item's ENHANCED variant, and
-        // make the shop DISPLAY items with enhanced data (so cards/tooltips show real enhanced stats before buying).
-        // This lets the Upgrade Station sell enhanced items through the native BUY flow — souls spent and item
-        // granted by the engine, no custom client→server channel needed. The client adds the native IgnoreOwnership
-        // class to owned cards so clicking BUYS (enhanced) instead of selling. Reversible: drop these lines.
-        ConVar.Find("citadel_item_purchases_force_enhanced")?.SetInt(1);
-        ConVar.Find("citadel_shop_items_appear_enhanced")?.SetInt(1);
+        // Item-slot capacity: unlock the flex slots so players can hold more bought items before the native
+        // "replace an item?" prompt. The true no-limit is the Street Brawl ruleset, but enabling it crashes our
+        // Invalid-mode PvE match — so flex unlock is the safe lever. (Granting via AddItem still bypasses slots;
+        // it's the SHOP BUY path that enforces them client-side.)
+        ConVar.Find("citadel_hero_demo_unlock_flex_slots")?.SetInt(1);
+        Server.ExecuteCommand("citadel_unlock_flex_slots"); // no team arg = both teams
+
+        // NOTE: we intentionally do NOT set citadel_item_purchases_force_enhanced — it auto-enhanced every native
+        // purchase (e.g. imbue items bought through their own popup came out enhanced at base price, bypassing our
+        // intercept). The Upgrade Station grants enhanced variants explicitly via the sellitem→enhance path instead.
+        // citadel_shop_items_appear_enhanced is also dropped (it's a cl+cheat convar the server can't set anyway).
+
+        // NOTE: the 23 "legendaries" are Street Brawl items (m_eAbilityRequirements="ERequirementStreetBrawl").
+        // Enabling citadel_gamemode_streetbrawl_enabled to satisfy that requirement CRASHES the server (the mode
+        // can't run on our Invalid-mode PvE match). Instead we unlock their purchase client-side by clearing that
+        // requirement in our abilities.vdata override (no mode change) — the client then sends buyitem and our
+        // OnClientConCommand intercept grants + charges the flat legendary price.
 
         // Front-load loot crates: spawn them at match start instead of after the default delay (the bridge-buff
         // powerup spawners are a separate system and untouched). Convar names confirmed in server.dll.
@@ -142,22 +140,66 @@ public sealed partial class BossRushPlugin : DeadworksPluginBase
 
     /// <summary>
     /// Upgrade Station — the real intercept. The client relays shop clicks to the server as concommands (over
-    /// CM_ClientUIEvent): clicking an OWNED item sends "sellitem &lt;upgrade_name&gt;", a buy sends
+    /// CM_ClientUIEvent): clicking an OWNED item sends "sellitem &lt;upgrade_name&gt;", clicking a BUYABLE item sends
     /// "buyitem &lt;upgrade_name&gt;" — the item is the exact internal catalog name (e.g. upgrade_high_velocity_mag).
-    /// We turn the SELL into an enhance: veto the native sell (HookResult.Stop) and enhance the still-held item
-    /// (charge 2× + grant the enhanced variant). One click = enhance, no client channel, no UI hacks. Buys pass
-    /// through (citadel_item_purchases_force_enhanced already makes them enhanced).
+    /// Both are vetoable concommands, so we redirect them to the station:
+    ///   • SELL (owned card) → enhance the still-held item (charge 2× + grant the enhanced variant).
+    ///   • BUY (legendary card) → grant the legendary at the flat <see cref="BossRushConfig.LegendaryPrice"/>.
+    ///   • BUY (anything else) → blocked when <see cref="BossRushConfig.StoreLegendariesOnly"/> (power = world loot).
+    /// One click each, no client channel, no UI hacks. Args is argv-style: Args[0] = command name, Args[1] = item.
     /// </summary>
     public override HookResult OnClientConCommand(ClientConCommandEvent e)
     {
-        if (e.Command is "sellitem" or "buyitem")
+        if (e.Command is "sellitem" or "buyitem" or "buydependentitem")
             Console.WriteLine($"[Boss Rush] shop cmd: {e.Command} [{string.Join(" ", e.Args)}]");
 
-        // Args is argv-style: Args[0] is the command name ("sellitem"), Args[1] is the item (upgrade_<name>).
-        if (e.Command == "sellitem" && e.Args.Length > 1 && e.Controller is { } caller)
+        if (e.Controller is not { } caller || e.Args.Length <= 1)
+            return HookResult.Continue;
+        var item = e.Args[1];
+
+        if (e.Command == "sellitem")
         {
-            _upgrades.HandleShopEnhance(caller, e.Args[1]); // item still held (we block the sell) → enhances in place
-            return HookResult.Stop;                          // veto the native sell
+            _upgrades.HandleShopEnhance(caller, item); // item still held (we block the sell) → enhances in place
+            return HookResult.Stop;                     // veto the native sell
+        }
+
+        if (e.Command == "buyitem")
+        {
+            if (ItemCatalog.TierOf(item) == Config.LegendaryTier)
+            {
+                _upgrades.HandleBuyLegendaryCommand(caller, item); // flat-price grant (veto native — native price is wrong)
+                return HookResult.Stop;
+            }
+            if (Config.StoreLegendariesOnly)
+            {
+                Chat.PrintToChat(caller, "[Boss Rush] base items are loot-only — only legendaries are sold at the Mythic Altar.");
+                return HookResult.Stop; // block base purchases
+            }
+        }
+
+        // Imbue legendaries buy through their own popup as "buydependentitem <item> <abilitySlot>". Vetoing would
+        // skip the imbue, so we let the native buy+imbue run and then force the NET cost to the flat legendary price
+        // on the next tick — independent of whatever the engine charged for the relabeled tier-4 card.
+        if (e.Command == "buydependentitem" && ItemCatalog.TierOf(item) == Config.LegendaryTier
+            && caller.GetHeroPawn()?.As<CCitadelPlayerPawn>() is { } imbuePawn)
+        {
+            int before = imbuePawn.GetCurrency(ECurrencyType.EGold);
+            if (before < Config.LegendaryPrice)
+            {
+                Chat.PrintToChat(caller, $"[Boss Rush] need {Config.LegendaryPrice} souls for {item}.");
+                return HookResult.Stop; // can't afford the flat legendary price — block before the imbue runs
+            }
+            int target = before - Config.LegendaryPrice;
+            Timer.Once(0.2.Seconds(), () =>
+            {
+                if (caller.GetHeroPawn()?.As<CCitadelPlayerPawn>() is { } p)
+                {
+                    int now = p.GetCurrency(ECurrencyType.EGold);
+                    if (now > target) // deduct only the surcharge beyond what the engine already took
+                        p.ModifyCurrency(ECurrencyType.EGold, -(now - target), ECurrencySource.ECheats, spendOnly: true);
+                }
+            });
+            return HookResult.Continue; // let native do the imbue + its own charge
         }
         return HookResult.Continue;
     }

@@ -1,8 +1,79 @@
 # Deadlock BOSS RUSH — Project Handoff & State
 
 > **⚠️ Sections 1–12 + older CURRENT STATE blocks below are STALE snapshots. Read the
-> 2026-06-22 block first; trust it over everything older where they conflict.** Deep detail also lives
-> in agent memory `reference_deadlock-shop-current-state.md` + `reference_csdk-build-pipeline.md`.
+> 2026-06-27 + 2026-06-23 + 2026-06-22 blocks first; trust them over everything older where they conflict.**
+> Deep detail also lives in agent memory `reference_deadlock-shop-current-state.md` + `reference_csdk-build-pipeline.md`.
+
+---
+
+## CURRENT STATE — 2026-06-27 ✅ MANILA TABS + CUSTOM LOGO (custom-texture pipeline cracked)
+
+Branch `feat/p3-rem-sleep`. The shop now has color-matched **manila folder tabs** hanging below the panel and the custom **ArchMother's Upgrade Station** logo header. Getting a custom image into the addon was the hard part — solved below.
+
+### ★ CUSTOM ADDON TEXTURES — the reusable pipeline (this was NOT obvious)
+Shipping our own image in the addon. Hard-won rules:
+- **The CLI resourcecompiler CANNOT compile a bare `.png` or `.psd`** ("Failed to find compiler for file"). It only compiles a **`.vtex` SOURCE** that points at the image.
+- **A `.vtex` source is DMX, NOT KV3.** A KV3 header gives "Cannot determine encoding". Use:
+  `<!-- dmx encoding keyvalues2_noids 1 format vtex 1 -->` then root `"CDmeVtex" { … }`. (See the exact working file at `client/panorama/images/bossrush/archmother_us.vtex`.)
+- **`m_fileName` resolves relative to the ADDON ROOT, not the `.vtex` file** → must be the full `panorama/images/bossrush/archmother_us.psd`.
+- **Non-power-of-two images fail mip generation** ("non-power-of-two texture support not enabled", e.g. 2171×387). UI needs no mips → set the channel's `m_mipAlgorithm` `m_algorithm` to **`"None"`**.
+- **DXT5 renders WRONG via Panorama `background-image`** — it shows the alpha channel as grayscale and ignores RGB + transparency (looked B&W in-game). **Use `m_outputFormat` `"RGBA8888"`** (uncompressed) for UI textures with color+alpha. Bigger VPK (~3.4 MB for this logo) but correct.
+- **`.vsvg` does NOT paint from an addon** — it compiles and shows in Source2Viewer, but Panorama won't paint addon-shipped vsvg at a new path OR even when overriding an existing game vsvg path. Use **vtex**, not vsvg, for addon art.
+- A **new addon-path vtex DOES paint** via `background-image: url("s2r://panorama/images/bossrush/archmother_us.vtex")` — the "new files don't paint" problem was vsvg-specific.
+- **Verify a compiled texture's real pixels**: `Source2Viewer-CLI -i <file>.vtex_c -d -o <out>` dumps a `.png`; read it to confirm color/alpha before blaming the renderer. (This is how we proved the vtex was correct and the bug was DXT5 rendering.)
+- **Build step:** author `archmother_us.vtex` (DMX) + place `archmother_us.psd` in `content/.../panorama/images/bossrush/` → `resourcecompiler -f -danger_mode_ignore_schema_mismatches -game <citadel> -i archmother_us.vtex` → produces `archmother_us.vtex_c` in `game/.../images/bossrush/` → pack → deploy. The PSD must be RGB.
+
+### Manila folder tabs (`bossrush_shop.vcss` + the layout)
+- `BRTabBar` moved to be a **sibling of `BRModal`** (below it) in `BRCenter`; centered via `width: fit-children; horizontal-align: center`.
+- Tabs **fan/overlap** (`margin-right: -16px`) with `.BRTabActive { z-index: 10 }` so the active one is on top; rounded-BOTTOM corners (`border-radius: 0 0 16px 16px`) so they hang below the panel; `vertical-align: top` so the taller active tab drops lower.
+- **Category icons pulled from the native shop**: `s2r://panorama/images/shop/catalog/catalog_shop_tab_icon_{weapon,vitality,spirit,builds}_psd.vtex`, tinted per category with `wash-color` (weapon `#e0954a`, armor `#6FBF5B`, tech `#B06FE8`, legendary `#8fb0e0`).
+- **Inactive = icon only** (`.BRTabLabel { visibility: collapse }`); **active = icon + label** (`.BRTabActive .BRTabLabel { visibility: visible }`).
+- **Switch animation** via `transition-property: height, background-color`. Active accent = `border-bottom: 5px <category>` + dark-category label color.
+
+### Logo header
+- `BRTitle` text replaced with `<Panel class="BRLogo" />` (BRHeader, above the subtitle). Style: `width 800px; height 143px; background-image url(".../archmother_us.vtex"); background-size 100% 100%`.
+- Source art: `content/.../panorama/images/bossrush/archmother_us.{psd,vtex}` (the `.svg` is the original, unused now — vsvg doesn't paint).
+
+### NEXT TASK (after /compact)
+- **Inner darkened scroll container** for the item grid: an inset darker panel that bleeds to the edges, items scroll down behind the lighter top frame (fade/mask where they pass under), cleaner bordering. (User mockup; take liberties to clean it up.)
+- Then remaining polish: the 6 legendaries that don't render as store cards (only 17/23 appear), Deadlock fonts, etc.
+
+---
+
+## CURRENT STATE — 2026-06-23 ✅ MYTHIC ALTAR: LEGENDARY BUY WORKING END-TO-END
+
+Branch `feat/p3-rem-sleep` (committed `60db099`). The **MYTHIC tab** sells the 17 "legendary" items as real store cards; clicking one buys it for a flat **30,000** souls (config `LegendaryPrice`). Server + client both done.
+
+### THE BREAKTHROUGH — how the legendaries got into the store (the niche finding)
+- The 23 "legendaries" are **Street Brawl items**: each carries `m_eAbilityRequirements = "ERequirementStreetBrawl"` + `m_iItemTier = "EModTier_5"` (icons under `items/brawl/`). Exactly 23 items in the game data have that requirement = our legendary set. The normal shop **excludes them by tier (only enumerates T1–4)** AND the client **suppresses the buy** (won't even send `buyitem`) because the StreetBrawl requirement isn't met.
+- **UNLOCK = two CLIENT `abilities.vdata` edits, BOTH required (either alone fails):**
+  1. **Strip the requirement** — delete the `m_eAbilityRequirements = "ERequirementStreetBrawl"` line (23 of them) so the client stops suppressing the buy.
+  2. **Relabel tier** — `m_iItemTier "EModTier_5" → "EModTier_4"` (27 lines) so the store *enumerates* them as cards.
+  Then **17 of the 23 render** as real, buy-wired store cards in the weapon/armor/tech category lists (the other 6 lack store-card structure). The SERVER keeps reading tier 5 from its own `all_items_tiers.txt` (we only edited the client VPK), so our intercept still recognizes them as legendaries.
+- **Enabling Street Brawl mode itself (`citadel_gamemode_streetbrawl_enabled 1`) CRASHES the server** — do NOT. The client-vdata requirement-strip is the safe substitute.
+
+### Server (`BossRushPlugin.OnClientConCommand` — all vetoable concommands)
+- `buyitem <T5>` → veto native + flat-charge `LegendaryPrice` (30k) + grant. `buyitem <non-T5>` → blocked (`StoreLegendariesOnly`; loot-only economy).
+- `buydependentitem <T5>` = the **imbue legendaries** (only 2: `upgrade_shivas_bracelet`, `upgrade_omnicharge_pendant`). Vetoing skips the imbue, so we let native imbue+charge run, then `Timer.Once(0.2s)` forces the player's **net** gold to `before − LegendaryPrice` (exact 30k regardless of what the engine charged).
+- **Removed `citadel_item_purchases_force_enhanced`** (it auto-enhanced native/imbue buys) + the `appear_enhanced` no-op + the convar re-assert timer. Flex slots unlocked in `ApplyRuleset` (`citadel_hero_demo_unlock_flex_slots 1` + `citadel_unlock_flex_slots`).
+
+### Client (`bossrush_probe.js`, MYTHIC tab)
+- Reads the **category lists** `ShopModsListWeapon/Armor/Tech` (NOT `ShopModsListAll` — that's the *search* list, empty without a query), filters to the 17 legendaries by display name (`LEGENDARY_NAMES`), reparents those store cards. `selectTab` dispatches all three slots to populate them.
+- Forces the card price label to `30,000` and hides the enhance/sell overlays on buy cards; `flipHoverTooltip` clears the stale enhance-flip on unowned cards (the tooltip panel is shared) and relabels legendary cost to 30k.
+
+### Dropped dead-ends (don't retry)
+- The **build/favorites view**: `ShopModsSelectedBuild` cards render any tier (no filter) but are **display-only / not buy-wired**; activating `EItemSlotType_Favorites` to wire them **crashes** on shop-reopen (reparenting C++ build cards mid-buy). Abandoned for the store-card path above.
+- Tier-relabel *alone* (requirement still present) and requirement-strip *alone* (tier still 5) both fail — needs both.
+
+### POLISH + PERF — ✅ done (2026-06-23, committed `31429fb`)
+- **Tooltip price (was the "12,800 on everything" bug):** it was OUR `flipHoverTooltip` injecting an enhance-price row into the SHARED hover tooltip and never updating it (first hovered item's `base×2` stuck for all). Fix: hide the native price on BOTH the card preview (`ItemCost`) and the extended details tooltip (`CitadelTooltipModDetails` → `ModCostContainer`/`ModCost` class — different from `ItemCost`), and show our own row, **updated every hover** — owned `base×2`, legendary flat 30k. Action word reads Buy vs Enhance; enhance arrow (`enhancedIcon`) hidden on buy cards.
+- **Unlimited items via the slots-full dialog (no file edits!):** a full-slot buy pops "ITEM SLOTS FULL — select an item to replace"; picking one fires `sellitem(old)` → our intercept **enhances** the old item (not sells) + `buyitem(new)` grants the new legendary → you keep BOTH. We relabel the dialog "ENHANCE A FREE ITEM!" / "Select an item to ENHANCE" (`handleSlotsFullPopup`). So the heroes.vdata slot-cap edit is NOT needed.
+- **★ THE SHOP-POLL HITCH (niche, important):** the shop layout **stays active/laid-out in the background** after the first open, so `cStation.actuallayoutwidth` is ALWAYS > 0 → the old gate never read "closed" → the poll did full work + kept native cards borrowed forever → permanent hitch (open or closed). FIX: gate on the **`gShopOpen`** class the engine toggles on the `CitadelHudHeroShop` root (find it by walking parents to `paneltype === "CitadelHudHeroShop"`; the native shop JS uses the same signal). On `!gShopOpen` we also `returnBorrowed()` so the native shop stops churning over the reparented cards while hidden. Also: rebuild the grid ONLY on tab change (no periodic reparent churn), and gate the per-tick list-probe + tooltip traversals.
+
+### Still OPEN / next
+- **NEXT TASK: manilla folder tabs** — replace the FAIRWAY/MPS/CURIOSITY/MYTHIC nav buttons with color-matched, dynamically-shaped manilla file-folder tabs (active = raised/colored, inactive = tucked). Needs per-category color theming + tab shape art.
+- **Keep native cards** (user requirement): they carry real-time-calculated stats + the starry hover effect; do NOT switch to custom tiles.
+- **(optional) `_include` rework** — our abilities.vdata override still ships the whole 6.9MB dump (works, but stale-data risk). Game `abilities.vdata` is tiny + `_include = [ resource_name:"scripts/abilities/<hero>.vdata_inc", … ]`. Could rebuild as header + `_include[base]` + only the ~50 legendary edit lines (re-defined keys override included). Not urgent now that the 12,800 is fixed. `heroes.vdata` has no include array.
 
 ---
 
