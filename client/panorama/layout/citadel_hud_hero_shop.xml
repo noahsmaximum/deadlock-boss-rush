@@ -140,18 +140,11 @@
 
 				<!-- Header sits OUTSIDE the modal frame -->
 				<Panel class="BRHeader">
-					<Label class="BRTitle" text="◆  UPGRADE STATION  ◆" />
+						<Panel class="BRLogo" />
 					<Label class="BRSubtitle" text="Loot powers you — spend Souls to enhance what you hold." />
 				</Panel>
 
 				<Panel class="BRModal catWeapon">
-					<Panel class="BRTabBar">
-						<Panel class="BRTab BRTabWeapon BRTabActive"><Label class="BRTabLabel" text="FAIRWAY" /></Panel>
-						<Panel class="BRTab BRTabArmor"><Label class="BRTabLabel" text="MPS" /></Panel>
-						<Panel class="BRTab BRTabTech"><Label class="BRTabLabel" text="CURIOSITY CATALOG" /></Panel>
-						<Panel class="BRTab BRTabLegendary"><Label class="BRTabLabel" text="LEGENDARIES" /></Panel>
-					</Panel>
-
 					<Panel class="BRGridHeader">
 						<Label class="BRGridTitle" text="OWNED · FAIRWAY" />
 						<Label class="BRHeld" text="8 HELD" />
@@ -160,6 +153,14 @@
 					<Panel class="BRGrid" />
 
 					<Label class="BRFooter" text="ESC / B — Close" />
+				</Panel>
+
+				<!-- Manila folder tabs hang BELOW the panel: centered, fanned/overlapping, active pops forward -->
+				<Panel class="BRTabBar">
+					<Panel class="BRTab BRTabWeapon BRTabActive"><Panel class="BRTabIcon" /><Label class="BRTabLabel" text="FAIRWAY" /></Panel>
+					<Panel class="BRTab BRTabArmor"><Panel class="BRTabIcon" /><Label class="BRTabLabel" text="MPS" /></Panel>
+					<Panel class="BRTab BRTabTech"><Panel class="BRTabIcon" /><Label class="BRTabLabel" text="CURIOSITY CATALOG" /></Panel>
+					<Panel class="BRTab BRTabLegendary"><Panel class="BRTabIcon" /><Label class="BRTabLabel" text="LEGENDARIES" /></Panel>
 				</Panel>
 			</Panel>
 		</Panel>

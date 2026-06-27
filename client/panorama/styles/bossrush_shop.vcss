@@ -35,6 +35,15 @@
 	text-align: center;
 	margin-top: 4px;
 }
+.BRLogo
+{
+	width: 800px;
+	height: 143px;
+	horizontal-align: center;
+	background-image: url("s2r://panorama/images/bossrush/archmother_us.vtex");
+	background-size: 100% 100%;
+	background-repeat: no-repeat;
+}
 
 /* ── The modal frame ── */
 .BRModal
@@ -55,23 +64,35 @@
 }
 
 /* ── Tab bar ── */
-.BRTabBar { flow-children: right; width: 100%; height: 30px; margin-bottom: 12px; }
+.BRTabBar { flow-children: right; width: fit-children; horizontal-align: center; height: 58px; margin-top: -2px; }
 .BRTab
 {
+	flow-children: right;
 	width: fit-children;
-	height: 28px;
-	margin-right: 6px;
-	padding: 0px 14px;
-	background-color: #211e28;
-	border: 1px solid #3a3f4a;
-	border-radius: 4px;
+	height: 40px;
+	margin-right: -16px;
+	padding: 0px 18px;
+	background-color: #b6a374;
+	border-left: 1px solid #00000055;
+	border-right: 1px solid #00000055;
+	border-bottom: 3px solid #8a7a4f;
+	border-radius: 0px 0px 16px 16px;
+	vertical-align: top;
+	transition-property: height, background-color, border-bottom-width;
+	transition-duration: 0.16s;
+	transition-timing-function: ease-in-out;
 }
-.BRTabLabel { font-size: 12px; font-weight: bold; color: #97a0b0; horizontal-align: center; vertical-align: center; text-align: center; }
-.BRTab:hover { border: 1px solid #8a90a0; }
-.BRTabActive { background-color: #34230f; border: 1px solid #FFD24A; }
-.BRTabActive .BRTabLabel { color: #FFD24A; }
-.BRTabWeapon.BRTabActive { border: 1px solid #e0954a; }
-.BRTabWeapon.BRTabActive .BRTabLabel { color: #e0954a; }
+.BRTabIcon { width: 26px; height: 26px; vertical-align: center; background-size: 100% 100%; }
+.BRTabLabel { font-size: 14px; font-weight: bold; color: #4f4631; vertical-align: center; text-align: center; letter-spacing: 0.5px; margin-left: 8px; visibility: collapse; }
+.BRTab:hover { background-color: #c6b079; }
+.BRTabActive { background-color: #ecd9a8; height: 52px; z-index: 10; }
+.BRTabActive .BRTabLabel { visibility: visible; color: #3a3122; }
+.BRTabWeapon .BRTabIcon    { background-image: url("s2r://panorama/images/shop/catalog/catalog_shop_tab_icon_weapon_psd.vtex"); wash-color: #e0954a; }
+.BRTabArmor .BRTabIcon     { background-image: url("s2r://panorama/images/shop/catalog/catalog_shop_tab_icon_vitality_psd.vtex"); wash-color: #6FBF5B; }
+.BRTabTech .BRTabIcon      { background-image: url("s2r://panorama/images/shop/catalog/catalog_shop_tab_icon_spirit_psd.vtex"); wash-color: #B06FE8; }
+.BRTabLegendary .BRTabIcon { background-image: url("s2r://panorama/images/shop/catalog/catalog_shop_tab_icon_builds_psd.vtex"); wash-color: #8fb0e0; }
+.BRTabWeapon.BRTabActive { border-bottom: 5px solid #e0954a; }
+.BRTabWeapon.BRTabActive .BRTabLabel { color: #6e4212; }
 
 .BRSouls
 {
@@ -293,13 +314,13 @@
 .catLegendary .BRTile { border: 2px solid #38415a; }
 .catLegendary .BRTileNameBar { background-color: #0c1018ee; }
 
-/* ── active-tab accents ── */
-.BRTabArmor.BRTabActive { background-color: #16240f; border: 1px solid #6FBF5B; }
-.BRTabArmor.BRTabActive .BRTabLabel { color: #6FBF5B; }
-.BRTabTech.BRTabActive { background-color: #1d1430; border: 1px solid #B06FE8; }
-.BRTabTech.BRTabActive .BRTabLabel { color: #B06FE8; }
-.BRTabLegendary.BRTabActive { background-color: #1a2233; border: 1px solid #8fb0e0; }
-.BRTabLegendary.BRTabActive .BRTabLabel { color: #cdd9ee; }
+/* ── active-tab accents (manila tabs: category color is the bottom edge + label) ── */
+.BRTabArmor.BRTabActive { border-bottom: 5px solid #6FBF5B; }
+.BRTabArmor.BRTabActive .BRTabLabel { color: #2f5a26; }
+.BRTabTech.BRTabActive { border-bottom: 5px solid #B06FE8; }
+.BRTabTech.BRTabActive .BRTabLabel { color: #4a2d6b; }
+.BRTabLegendary.BRTabActive { border-bottom: 5px solid #8fb0e0; }
+.BRTabLegendary.BRTabActive .BRTabLabel { color: #2e4566; }
 
 /* ── selection: non-legendary uses a border (the bright title bar is the real cue, set globally);
       legendary keeps a chromatic-aberration glow (magenta/cyan offset). ── */

@@ -1,8 +1,42 @@
 # Deadlock BOSS RUSH — Project Handoff & State
 
 > **⚠️ Sections 1–12 + older CURRENT STATE blocks below are STALE snapshots. Read the
-> 2026-06-23 + 2026-06-22 blocks first; trust them over everything older where they conflict.** Deep detail
-> also lives in agent memory `reference_deadlock-shop-current-state.md` + `reference_csdk-build-pipeline.md`.
+> 2026-06-27 + 2026-06-23 + 2026-06-22 blocks first; trust them over everything older where they conflict.**
+> Deep detail also lives in agent memory `reference_deadlock-shop-current-state.md` + `reference_csdk-build-pipeline.md`.
+
+---
+
+## CURRENT STATE — 2026-06-27 ✅ MANILA TABS + CUSTOM LOGO (custom-texture pipeline cracked)
+
+Branch `feat/p3-rem-sleep`. The shop now has color-matched **manila folder tabs** hanging below the panel and the custom **ArchMother's Upgrade Station** logo header. Getting a custom image into the addon was the hard part — solved below.
+
+### ★ CUSTOM ADDON TEXTURES — the reusable pipeline (this was NOT obvious)
+Shipping our own image in the addon. Hard-won rules:
+- **The CLI resourcecompiler CANNOT compile a bare `.png` or `.psd`** ("Failed to find compiler for file"). It only compiles a **`.vtex` SOURCE** that points at the image.
+- **A `.vtex` source is DMX, NOT KV3.** A KV3 header gives "Cannot determine encoding". Use:
+  `<!-- dmx encoding keyvalues2_noids 1 format vtex 1 -->` then root `"CDmeVtex" { … }`. (See the exact working file at `client/panorama/images/bossrush/archmother_us.vtex`.)
+- **`m_fileName` resolves relative to the ADDON ROOT, not the `.vtex` file** → must be the full `panorama/images/bossrush/archmother_us.psd`.
+- **Non-power-of-two images fail mip generation** ("non-power-of-two texture support not enabled", e.g. 2171×387). UI needs no mips → set the channel's `m_mipAlgorithm` `m_algorithm` to **`"None"`**.
+- **DXT5 renders WRONG via Panorama `background-image`** — it shows the alpha channel as grayscale and ignores RGB + transparency (looked B&W in-game). **Use `m_outputFormat` `"RGBA8888"`** (uncompressed) for UI textures with color+alpha. Bigger VPK (~3.4 MB for this logo) but correct.
+- **`.vsvg` does NOT paint from an addon** — it compiles and shows in Source2Viewer, but Panorama won't paint addon-shipped vsvg at a new path OR even when overriding an existing game vsvg path. Use **vtex**, not vsvg, for addon art.
+- A **new addon-path vtex DOES paint** via `background-image: url("s2r://panorama/images/bossrush/archmother_us.vtex")` — the "new files don't paint" problem was vsvg-specific.
+- **Verify a compiled texture's real pixels**: `Source2Viewer-CLI -i <file>.vtex_c -d -o <out>` dumps a `.png`; read it to confirm color/alpha before blaming the renderer. (This is how we proved the vtex was correct and the bug was DXT5 rendering.)
+- **Build step:** author `archmother_us.vtex` (DMX) + place `archmother_us.psd` in `content/.../panorama/images/bossrush/` → `resourcecompiler -f -danger_mode_ignore_schema_mismatches -game <citadel> -i archmother_us.vtex` → produces `archmother_us.vtex_c` in `game/.../images/bossrush/` → pack → deploy. The PSD must be RGB.
+
+### Manila folder tabs (`bossrush_shop.vcss` + the layout)
+- `BRTabBar` moved to be a **sibling of `BRModal`** (below it) in `BRCenter`; centered via `width: fit-children; horizontal-align: center`.
+- Tabs **fan/overlap** (`margin-right: -16px`) with `.BRTabActive { z-index: 10 }` so the active one is on top; rounded-BOTTOM corners (`border-radius: 0 0 16px 16px`) so they hang below the panel; `vertical-align: top` so the taller active tab drops lower.
+- **Category icons pulled from the native shop**: `s2r://panorama/images/shop/catalog/catalog_shop_tab_icon_{weapon,vitality,spirit,builds}_psd.vtex`, tinted per category with `wash-color` (weapon `#e0954a`, armor `#6FBF5B`, tech `#B06FE8`, legendary `#8fb0e0`).
+- **Inactive = icon only** (`.BRTabLabel { visibility: collapse }`); **active = icon + label** (`.BRTabActive .BRTabLabel { visibility: visible }`).
+- **Switch animation** via `transition-property: height, background-color`. Active accent = `border-bottom: 5px <category>` + dark-category label color.
+
+### Logo header
+- `BRTitle` text replaced with `<Panel class="BRLogo" />` (BRHeader, above the subtitle). Style: `width 800px; height 143px; background-image url(".../archmother_us.vtex"); background-size 100% 100%`.
+- Source art: `content/.../panorama/images/bossrush/archmother_us.{psd,vtex}` (the `.svg` is the original, unused now — vsvg doesn't paint).
+
+### NEXT TASK (after /compact)
+- **Inner darkened scroll container** for the item grid: an inset darker panel that bleeds to the edges, items scroll down behind the lighter top frame (fade/mask where they pass under), cleaner bordering. (User mockup; take liberties to clean it up.)
+- Then remaining polish: the 6 legendaries that don't render as store cards (only 17/23 appear), Deadlock fonts, etc.
 
 ---
 
