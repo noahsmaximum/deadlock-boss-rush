@@ -149,10 +149,15 @@
 						<Label class="BRGridTitle" text="OWNED · FAIRWAY" />
 						<Label class="BRHeld" text="8 HELD" />
 					</Panel>
-					<!-- Tiles are reparented native cards, built by bossrush_probe.js -->
-					<Panel class="BRGrid" />
-
-					<Label class="BRFooter" text="ESC / B — Close" />
+					<!-- Recessed dark well: bleeds to the modal edges; the grid scrolls inside, items
+					     dissolve under the top/bottom fades (so they tuck behind the lighter frame). -->
+					<Panel class="BRWell">
+						<!-- Tiles are reparented native cards, built by bossrush_probe.js -->
+						<Panel class="BRGrid" />
+						<Panel class="BRWellTopFade" hittest="false" />
+						<Panel class="BRWellBotFade" hittest="false" />
+						<Label class="BRFooter" text="ESC / B — Close" hittest="false" />
+					</Panel>
 				</Panel>
 
 				<!-- Manila folder tabs hang BELOW the panel: centered, fanned/overlapping, active pops forward -->
