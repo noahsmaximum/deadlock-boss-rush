@@ -120,10 +120,44 @@
 .catLegendary .BRGridTitle { color: #aeb6c6; }
 .catLegendary .BRHeld { color: #8a93a6; }
 
-/* noclip on the horizontal axis + a little padding so hover scale/rotate isn't clipped by the
-   scroll viewport; vertical still scrolls for 9+ items. */
-/* center the whole grid block (sizes to its widest row) instead of per-row centering */
-.BRGrid { flow-children: down; width: fit-children; height: 384px; horizontal-align: center; padding: 8px 0px; overflow: noclip scroll; }
+/* ── Inner darkened scroll well ───────────────────────────────────────────────────────────
+   A recessed dark container that BLEEDS to the modal's side + bottom borders (negative margins
+   cancel the modal's 18px padding). The grid scrolls inside it; top/bottom fade overlays make
+   items dissolve as they tuck behind the lighter top frame / bottom edge. Inset shadow + a thin
+   top line give it the "sunken ledge" depth. Category-agnostic (translucent dark over any bg). */
+.BRWell
+{
+	width: 928px;
+	height: 452px;
+	margin: 0px -18px -18px -18px;
+	horizontal-align: center;
+	overflow: noclip noclip;
+	background-color: #0a0712e0;
+	border-top: 1px solid #00000099;
+	border-radius: 0px 0px 8px 8px;
+	box-shadow: inset 0px 7px 14px 0px #000000b3, inset 0px -6px 13px 0px #00000088;
+}
+
+/* top/bottom fades — fixed over the viewport (siblings of the scroller, well doesn't scroll),
+   so scrolled content fades into the well's dark edge instead of cutting off hard. hittest off. */
+.BRWellTopFade
+{
+	width: 100%;
+	height: 30px;
+	vertical-align: top;
+	background-color: gradient( linear, 0% 0%, 0% 100%, from( #0a0712ee ), to( #0a071200 ) );
+}
+.BRWellBotFade
+{
+	width: 100%;
+	height: 44px;
+	vertical-align: bottom;
+	background-color: gradient( linear, 0% 0%, 0% 100%, from( #0a071200 ), to( #0a0712f4 ) );
+}
+
+/* noclip on the horizontal axis so hover scale/rotate isn't clipped; vertical scrolls for 9+ items.
+   Fills the well; top/bottom padding keeps the first/last rows clear of the fades + footer. */
+.BRGrid { flow-children: down; width: 100%; height: 100%; horizontal-align: center; padding: 16px 0px 40px 0px; overflow: noclip scroll; }
 .BRRow { flow-children: right; width: fit-children; horizontal-align: center; margin-bottom: 12px; overflow: noclip; }
 
 /* Tile = square; icon FILLS it; name is a bottom overlay; tier badge floats top-right.
@@ -287,8 +321,9 @@
 }
 .BRActionLbl { font-size: 16px; font-weight: bold; color: #04222a; letter-spacing: 2px; vertical-align: center; }
 
-/* ── Footer ── */
-.BRFooter { font-size: 11px; color: #6e5417; horizontal-align: center; margin-top: 10px; }
+/* ── Footer (overlay on the well's bottom fade) ── */
+.BRFooter { font-size: 11px; color: #9b8a63; font-weight: bold; letter-spacing: 1px; horizontal-align: center; vertical-align: bottom; margin-bottom: 9px; }
+.catLegendary .BRFooter { color: #7f8aa0; }
 
 /* ── Sell → ENHANCE (native enhance mode) ──────────────────────────────────────────────────
    The reparented native cards carry their own #SellOverlay (hover "Sell") and a built-in,
